@@ -29,7 +29,9 @@ def compressor(total_temperature:float, total_pressure:float, efficiency:float, 
     total_temperature2_actual = (total_temperature2_ideal-total_temperature)/efficiency+total_temperature
 
     return total_temperature2_ideal, total_temperature2_actual, total_pressure2, ideal_work, actual_work
-    
+
+def inlet_design():
+    pass
 
 def main():
     mach0 = .8
