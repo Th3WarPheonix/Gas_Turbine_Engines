@@ -72,6 +72,66 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
 
     return np.array([streamtube_diameter, highlight_diameter, throat_diameter, fan_diameter]), diffuser_length, diffuser_length/throat_diameter
 
+def compressor_design(gamma=1.4, R_air=287.05):
+    Tt2 = 464.5 # R
+    Pt2 = 6.58 # psia
+    massflow2 = 70.17 # lbm/s
+    mach2 = np.linspace(.5, .55, 100) # at leading edge of first blade row
+    Tt31 = 897.7 # R
+    Pt31 = 52.67 # psia
+    mach31 = .3
+    massflow31 = 63.15 # lbm/s
+    work_coeff = .6
+    total_work = 103.97 # Btu/(lbm/sec)
+    comp_press_ratio = 8
+    comp_eff = .87
+    aspect_ratio = 2.5 # height to width ratio
+    inlet_radius_ratio = .4 # hub radius to tip radius ratio
+    max_tip_diam = 29.58 # in
+    max_tip_speed = 1500 # ft/s
+
+    Tt2, Tt31 = convert_temps([Tt2, Tt31], 'SI')
+    Pt2, Pt31 = convert_pressures([Pt2, Pt31], 'SI')
+    density2 = Pt2/(R_air*Tt2)
+    density31 = Pt31/(R_air*Tt31)
+    massflow2 = massflow2/2.205
+    massflow31 = massflow31/2.2051
+    max_tip_diam *= .0254 # m
+    max_tip_speed *= 12*.0254 # m/s
+    total_work = convert_work(total_work, 'SI') # J/(kg/s)
+
+    total_area = np.pi*max_tip_diam**2/4 # total cross sectional area of the compressor
+
+    spool_speed = (max_tip_speed)/(max_tip_diam/2) # rad/s
+    spool_speed_rpm = spool_speed*(1/(2*np.pi))*(60/1) # rpm
+    print(spool_speed, spool_speed_rpm)
+    
+    Ts31 = isenf.T(mach31, Tt31)
+    velocity31 = np.sqrt(gamma*R_air*Ts31)
+
+    outlet_flow_area = massflow31/density31/velocity31
+    outlet_hub_area = total_area - outlet_flow_area
+    outlet_hub_diam = np.sqrt(outlet_hub_area*4/np.pi)
+    outlet_blade_height = (max_tip_diam - outlet_hub_diam)/2
+
+    inlet_hub_radius = max_tip_diam/2*inlet_radius_ratio
+    inlet_hub_area = np.pi*inlet_hub_radius**2
+    inlet_flow_area = total_area - inlet_hub_area
+    inlet_blade_height = np.sqrt(inlet_flow_area/np.pi)
+
+    avg_pitch_diam2  = (max_tip_diam + inlet_hub_radius*2)/2
+    avg_pitch_diam31 = (max_tip_diam + outlet_hub_diam)/2
+    avg_pitch_diam = (avg_pitch_diam2 + avg_pitch_diam31)/2
+    avg_blade_height = (inlet_blade_height + outlet_blade_height)/2
+    avg_velocity = spool_speed * avg_pitch_diam/2
+    avg_blade_width = avg_blade_height/aspect_ratio
+    avg_gap = .25*avg_blade_width
+    
+
+    stage_work = work_coeff*avg_velocity**2/2 # work per stage
+    num_stages = total_work/stage_work
+    num_stages = np.ceil(num_stages)
+
 def engine_configuration(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, gamma_hot):
     Tt0, Pt0 = ambient_properties(mach0, Tambient, Pambient)
     Tt1, Pt1, Ts1, Ps1, Vel1 = inlet(mach1, Tt0, Pt0, inlet_press_rec)
@@ -101,9 +161,9 @@ def engine_configuration(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_
     station13 = pd.Series([Tt13i_emp, Tt13a_emp, Pt13_emp, Wfi_emp, Wfa_emp], index=[np.repeat('13 Bypass/Compressor Inlet', len(labels13)), labels13])
 
     labels3 = np.array(['Total Temperature Ideal (R)', 'Total Temperature Actual (R)', 'Total Pressure (psia)', 'Work Ideal (BTU/lbm)', 'Work Actual (BTU/lbm)'])
-    station3 = pd.Series([Tt3i_emp, Tt3a_emp, Pt3_emp, Wci_emp, Wca_emp], index=[np.repeat('3 Comubstor Inlet', len(labels3)), labels3])
-
-    return station0, station1, station13, station3
+    station3 = pd.Series([Tt3i_emp, Tt3a_emp, Pt3_emp, Wci_emp, Wca_emp], index=[np.repeat('3 Compressor Exit', len(labels3)), labels3])
+    
+    return (station0, station1, station13, station3)
 
 def convert_temps(temps, to):
     """Convert the temperature from K to R"""
@@ -130,10 +190,10 @@ def convert_pressures(pressures, to):
             return np.array(pressures)/6895
     elif to == 'SI':
         try:
-            pressures = pressures*6895
+            pressures = pressures*6895.0
             return pressures
         except:
-            return np.array(pressures)* 6895
+            return np.array(pressures)*6895.0
 
 def convert_work(works, to):
     """Convert the work from J to Btu"""
@@ -169,6 +229,8 @@ def main():
     comp_eff = .87
     comp_press_ratio = [7, 9, 9]
 
+    Ts3max = 450 # F
+
     m31 = .9
     LHV = 18550 # BTU/lbmfuel
     LHV = convert_work(LHV, 'SI')
@@ -176,7 +238,7 @@ def main():
     Tt4 = convert_temps(turbine_inlet_temp, 'SI')
     comb_eff = .995
     gamma_hot = 1.3
-    
+
     dfConfigs = pd.DataFrame()
     for i in range(3):
         station0, station1, station13, station3 = engine_configuration(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, gamma_hot)
@@ -185,15 +247,18 @@ def main():
     dfConfigs.index=dfConfigs.index.rename(['Station','Property'])
     print(dfConfigs)
 
-    plt.plot(comp_press_ratio[0:2], dfConfigs['Config 1'].loc['3 Combustor', 'Total Temperature Actual (R)']
-    
-    )
+    # plt.plot(comp_press_ratio, dfConfigs.loc['3 Compressor Exit', 'Total Temperature Actual (R)'] - 460)
+    # plt.xlabel(r'Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
+    # plt.ylabel(r'Compressor Exit Temperature $T_{s_3}$ F')
+    # plt.axhline(Ts3max, linestyle=':')
+    # plt.title('Compressor Pressure Ratio vs Compressor Exit Temperature')
+    # plt.show()
     Tt0 = convert_temps(dfConfigs['Config 1'].loc['0 Freestream', 'Total Temperature (R)'], 'SI')
     Pt0 = convert_pressures(dfConfigs['Config 1'].loc['0 Freestream', 'Total Pressure (psia)'], 'SI')
     Ts1 = convert_temps(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Temperature (R)'], 'SI')
     Ps1 = convert_pressures(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Pressure (psia)'], 'SI')
-
-    '''Component Design'''
+    
+    '''Inlet Design'''
     density0 = Pambient/(Rair*Tambient)
     velocity0 = 795.5 # ft/s
     velocity0 = velocity0 * 12*.0254
@@ -205,7 +270,8 @@ def main():
     diffuser_angle = 5
     diams, diff_length, diff_LH = inlet_design(density0, velocity0, massflow0, A0Ahl, throat_mach, Tt0, Pt0, Ts1, Ps1, fan_mach, diffuser_angle)
     # print(diams/.0254, diff_length/.0254, diff_LH)
-
+    
 if __name__ == '__main__':
-    main()
+    # main()
+    compressor_design()
     
