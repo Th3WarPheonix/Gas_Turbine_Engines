@@ -4,6 +4,51 @@ import matplotlib.pyplot as plt
 import IsentropicFlow as isenf
 import pandas as pd
 
+def convert_temps(temps, to):
+    """Convert the temperature from K to R"""
+    if to == 'emp':
+        try:
+            temps *= 1.8
+            return temps
+        except:
+            return np.array(temps)*1.8
+    elif to == 'SI':
+        try:
+            temps = temps/1.8
+            return temps
+        except:
+            return np.array(temps)/1.8
+
+def convert_pressures(pressures, to):
+    """Convert the pressure from Pa to psia"""
+    if to == 'emp':
+        try:
+            pressures = pressures/6895
+            return pressures
+        except:
+            return np.array(pressures)/6895
+    elif to == 'SI':
+        try:
+            pressures = pressures*6895.0
+            return pressures
+        except:
+            return np.array(pressures)*6895.0
+
+def convert_work(works, to):
+    """Convert the work from J to Btu"""
+    if to == 'emp':
+        try:
+            works = works / 1055 / 2.205
+            return works
+        except:
+            return np.array(works) / 1055 / 2.205
+    elif to == 'SI':
+        try:
+            works = works * 1055 * 2.205
+            return works
+        except:
+            return np.array(works) * 1055 * 2.205
+
 def ambient_properties(mach:float, temperature:float, pressure:float, gamma:float=1.4):
     total_temperature = isenf.T0(mach, temperature, gamma)
     total_pressure    = isenf.p0(mach, pressure, gamma)
@@ -72,42 +117,16 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
 
     return np.array([streamtube_diameter, highlight_diameter, throat_diameter, fan_diameter]), diffuser_length, diffuser_length/throat_diameter
 
-
-
-def compressor_design(gamma=1.4, R_air=287.05):
-    Tt2 = 464.5 # R
-    Pt2 = 6.58 # psia
-    massflow2 = 70.17 # lbm/s
-    Tt31 = 897.7 # R
-    Pt31 = 52.67 # psia
-    mach31 = .3
-    massflow31 = 63.15 # lbm/s
-    work_coeff = .6
-    total_work = 103.97 # Btu/(lbm/sec)
-    comp_press_ratio = 8
-    comp_eff = .87
-    aspect_ratio = 2.5 # height to width ratio
-    inlet_radius_ratio = .4 # hub radius to tip radius ratio
-    max_tip_diam = 29.58 # in
-    max_tip_speed = 1500 # ft/s
-
-    Tt2, Tt31 = convert_temps([Tt2, Tt31], 'SI')
-    Pt2, Pt31 = convert_pressures([Pt2, Pt31], 'SI')
-    densityt2 = Pt2/(R_air*Tt2)
-    densityt31 = Pt31/(R_air*Tt31)
-    densitys31 = isenf.density(mach31, densityt31)
-    massflow2 = massflow2/2.205
-    massflow31 = massflow31/2.205
-    max_tip_diam *= .0254 # m
-    max_tip_speed *= 12*.0254 # m/s
-    total_work = convert_work(total_work, 'SI') # J/(kg/s)
-
+def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31, gamma=1.4, R_air=287.05):
     total_area = np.pi*max_tip_diam**2/4 # total cross sectional area of the compressor
     spool_speed = (max_tip_speed)/(max_tip_diam/2) # rad/s
     spool_speed_rpm = spool_speed*(1/(2*np.pi))*(60/1) # rpm
     
+    densityt2 = Pt2/(R_air*Tt2)
     Ts31 = isenf.T(mach31, Tt31)
     velocity31 = np.sqrt(gamma*R_air*Ts31)
+    densityt31 = Pt31/(R_air*Tt31)
+    densitys31 = isenf.density(mach31, densityt31)
 
     inlet_blade_height = max_tip_diam/(2*(1+inlet_radius_ratio))
     inlet_hub_radius = inlet_blade_height*inlet_radius_ratio
@@ -133,10 +152,14 @@ def compressor_design(gamma=1.4, R_air=287.05):
     num_stages = np.ceil(num_stages)
 
     mach2 = np.sqrt(2/(gamma-1)*((densityt2*inlet_flow_area*gamma*R_air*Tt2/massflow2)**((gamma-1)/gamma)-1)) # should be between .5 and .55 for conditions in assignment
+    Ts2 = isenf.T(mach2, Tt2)
+    Ps2 = isenf.p(mach2, Pt2)
+    densitys2 = isenf.density(mach2, densityt2)
+    velocity2 = mach2*np.sqrt(gamma*R_air*Ts2)
 
-    return (spool_speed_rpm, num_stages, compressor_length)
+    return ((mach2, Ts2, Ps2, densitys2, velocity2), spool_speed_rpm, num_stages, compressor_length)
 
-def engine_configuration(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, gamma_hot):
+def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, gamma_hot):
     Tt0, Pt0 = ambient_properties(mach0, Tambient, Pambient)
     Tt1, Pt1, Ts1, Ps1, Vel1 = inlet(mach1, Tt0, Pt0, inlet_press_rec)
     Tt13i, Tt13a, Pt13, Wfi, Wfa = compressor(Tt1, Pt1, fan_eff, fan_press_ratio, bypass_ratio) # for the fan
@@ -169,52 +192,7 @@ def engine_configuration(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_
     
     return (station0, station1, station13, station3)
 
-def convert_temps(temps, to):
-    """Convert the temperature from K to R"""
-    if to == 'emp':
-        try:
-            temps *= 1.8
-            return temps
-        except:
-            return np.array(temps)*1.8
-    elif to == 'SI':
-        try:
-            temps = temps/1.8
-            return temps
-        except:
-            return np.array(temps)/1.8
-
-def convert_pressures(pressures, to):
-    """Convert the pressure from Pa to psia"""
-    if to == 'emp':
-        try:
-            pressures = pressures/6895
-            return pressures
-        except:
-            return np.array(pressures)/6895
-    elif to == 'SI':
-        try:
-            pressures = pressures*6895.0
-            return pressures
-        except:
-            return np.array(pressures)*6895.0
-
-def convert_work(works, to):
-    """Convert the work from J to Btu"""
-    if to == 'emp':
-        try:
-            works = works / 1055 / 2.205
-            return works
-        except:
-            return np.array(works) / 1055 / 2.205
-    elif to == 'SI':
-        try:
-            works = works * 1055 * 2.205
-            return works
-        except:
-            return np.array(works) * 1055 * 2.205
-
-def main():
+def engine_configurations():
     Rair = 287.05 # J/kg-K
     mach0 = .8
     Tambient = -44.4 # C
@@ -233,8 +211,6 @@ def main():
     comp_eff = .87
     comp_press_ratio = [7, 9, 9]
 
-    Ts3max = 450 # F
-
     m31 = .9
     LHV = 18550 # BTU/lbmfuel
     LHV = convert_work(LHV, 'SI')
@@ -245,25 +221,32 @@ def main():
 
     dfConfigs = pd.DataFrame()
     for i in range(3):
-        station0, station1, station13, station3 = engine_configuration(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, gamma_hot)
+        station0, station1, station13, station3 = engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, gamma_hot)
         dfConfigi = pd.DataFrame(pd.concat([station0, station1, station13, station3]), columns=['Config {}'.format(i+1)])
         dfConfigs = pd.concat([dfConfigs, dfConfigi], axis=1)
-    dfConfigs.index=dfConfigs.index.rename(['Station','Property'])
-    print(dfConfigs)
+    dfConfigs.index = dfConfigs.index.rename(['Station','Property'])
+    dfConfigs.to_csv('Engine Configurations.csv')
+    return dfConfigs
+    
+def engine_config_plots(dfConfigs, comp_press_ratio, Ts3max, T495max, Tt9max):
+    fig, axs = plt.subplots(2,2)
+    axs[0,0].plot(comp_press_ratio, dfConfigs.loc['3 Compressor Exit', 'Total Temperature Actual (R)'] - 460)
+    axs[0,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
+    axs[0,0].set_ylabel('Compressor Exit\nTemperature $T_{s_3}$ ($^\circ$F)')
+    axs[0,0].axhline(Ts3max, linestyle=':')
+    axs[0,0].set_title('Compressor Pressure Ratio vs\nCompressor Exit Temperature')
+    plt.show()
 
-    # plt.plot(comp_press_ratio, dfConfigs.loc['3 Compressor Exit', 'Total Temperature Actual (R)'] - 460)
-    # plt.xlabel(r'Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
-    # plt.ylabel(r'Compressor Exit Temperature $T_{s_3}$ F')
-    # plt.axhline(Ts3max, linestyle=':')
-    # plt.title('Compressor Pressure Ratio vs Compressor Exit Temperature')
-    # plt.show()
+def assignment5(dfConfigs, R_air=287.05):
     Tt0 = convert_temps(dfConfigs['Config 1'].loc['0 Freestream', 'Total Temperature (R)'], 'SI')
     Pt0 = convert_pressures(dfConfigs['Config 1'].loc['0 Freestream', 'Total Pressure (psia)'], 'SI')
+    Ts0 = convert_temps(dfConfigs['Config 1'].loc['0 Freestream', 'Static Temperature (R)'], 'SI')
+    Ps0 = convert_pressures(dfConfigs['Config 1'].loc['0 Freestream', 'Static Pressure (psia)'], 'SI')
     Ts1 = convert_temps(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Temperature (R)'], 'SI')
     Ps1 = convert_pressures(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Pressure (psia)'], 'SI')
-    
+
     '''Inlet Design'''
-    density0 = Pambient/(Rair*Tambient)
+    density0 = Ps0/(R_air*Ts0)
     velocity0 = 795.5 # ft/s
     velocity0 = velocity0 * 12*.0254
     massflow0 = 70.17 # lbm/s
@@ -273,9 +256,39 @@ def main():
     fan_mach = .4
     diffuser_angle = 5
     diams, diff_length, diff_LH = inlet_design(density0, velocity0, massflow0, A0Ahl, throat_mach, Tt0, Pt0, Ts1, Ps1, fan_mach, diffuser_angle)
-    # print(diams/.0254, diff_length/.0254, diff_LH)
-    
+    return (diams/.0254, diff_length/.0254, diff_LH)
+
+def assignment6():
+    """Compressor Design"""
+    Tt2 = 464.5 # R
+    Pt2 = 6.58 # psia
+    massflow2 = 70.17 # lbm/s
+    Tt31 = 897.7 # R
+    Pt31 = 52.67 # psia
+    mach31 = .3
+    massflow31 = 63.15 # lbm/s
+    work_coeff = .6
+    total_work = 103.97 # Btu/(lbm/sec)
+    comp_press_ratio = 8
+    comp_eff = .87
+    aspect_ratio = 2.5 # height to width ratio
+    inlet_radius_ratio = .4 # hub radius to tip radius ratio
+    max_tip_diam = 29.58 # in
+    max_tip_speed = 1500 # ft/s
+
+    Tt2, Tt31 = convert_temps([Tt2, Tt31], 'SI')
+    Pt2, Pt31 = convert_pressures([Pt2, Pt31], 'SI')
+    massflow2 = massflow2/2.205
+    massflow31 = massflow31/2.205
+    max_tip_diam *= .0254 # m
+    max_tip_speed *= 12*.0254 # m/s
+    total_work = convert_work(total_work, 'SI') # J/(kg/s)
+
+    return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
+
 if __name__ == '__main__':
-    # main()
-    print(compressor_design())
-    
+    Ts3max = 450 # F
+    dFrame = engine_configurations()
+    engine_config_plots(dFrame, [7, 9, 9], Ts3max, 0, 0)
+    # print(assignment5(dFrame))
+    # print(assignment6())
