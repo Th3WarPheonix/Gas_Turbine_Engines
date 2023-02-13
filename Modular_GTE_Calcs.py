@@ -72,11 +72,12 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
 
     return np.array([streamtube_diameter, highlight_diameter, throat_diameter, fan_diameter]), diffuser_length, diffuser_length/throat_diameter
 
+
+
 def compressor_design(gamma=1.4, R_air=287.05):
     Tt2 = 464.5 # R
     Pt2 = 6.58 # psia
     massflow2 = 70.17 # lbm/s
-    mach2 = np.linspace(.5, .55, 100) # at leading edge of first blade row
     Tt31 = 897.7 # R
     Pt31 = 52.67 # psia
     mach31 = .3
@@ -92,32 +93,31 @@ def compressor_design(gamma=1.4, R_air=287.05):
 
     Tt2, Tt31 = convert_temps([Tt2, Tt31], 'SI')
     Pt2, Pt31 = convert_pressures([Pt2, Pt31], 'SI')
-    density2 = Pt2/(R_air*Tt2)
-    density31 = Pt31/(R_air*Tt31)
+    densityt2 = Pt2/(R_air*Tt2)
+    densityt31 = Pt31/(R_air*Tt31)
+    densitys31 = isenf.density(mach31, densityt31)
     massflow2 = massflow2/2.205
-    massflow31 = massflow31/2.2051
+    massflow31 = massflow31/2.205
     max_tip_diam *= .0254 # m
     max_tip_speed *= 12*.0254 # m/s
     total_work = convert_work(total_work, 'SI') # J/(kg/s)
 
     total_area = np.pi*max_tip_diam**2/4 # total cross sectional area of the compressor
-
     spool_speed = (max_tip_speed)/(max_tip_diam/2) # rad/s
     spool_speed_rpm = spool_speed*(1/(2*np.pi))*(60/1) # rpm
-    print(spool_speed, spool_speed_rpm)
     
     Ts31 = isenf.T(mach31, Tt31)
     velocity31 = np.sqrt(gamma*R_air*Ts31)
 
-    outlet_flow_area = massflow31/density31/velocity31
+    inlet_blade_height = max_tip_diam/(2*(1+inlet_radius_ratio))
+    inlet_hub_radius = inlet_blade_height*inlet_radius_ratio
+    inlet_hub_area = np.pi*inlet_hub_radius**2
+    inlet_flow_area = total_area - inlet_hub_area
+
+    outlet_flow_area = massflow31/densitys31/velocity31
     outlet_hub_area = total_area - outlet_flow_area
     outlet_hub_diam = np.sqrt(outlet_hub_area*4/np.pi)
     outlet_blade_height = (max_tip_diam - outlet_hub_diam)/2
-
-    inlet_hub_radius = max_tip_diam/2*inlet_radius_ratio
-    inlet_hub_area = np.pi*inlet_hub_radius**2
-    inlet_flow_area = total_area - inlet_hub_area
-    inlet_blade_height = np.sqrt(inlet_flow_area/np.pi)
 
     avg_pitch_diam2  = (max_tip_diam + inlet_hub_radius*2)/2
     avg_pitch_diam31 = (max_tip_diam + outlet_hub_diam)/2
@@ -126,11 +126,15 @@ def compressor_design(gamma=1.4, R_air=287.05):
     avg_velocity = spool_speed * avg_pitch_diam/2
     avg_blade_width = avg_blade_height/aspect_ratio
     avg_gap = .25*avg_blade_width
-    
+    compressor_length = 6*(2*avg_blade_width+avg_gap) + 5*avg_gap # 6 rotor-stator stages + 11 gaps in between all of the rotors and stators
 
     stage_work = work_coeff*avg_velocity**2/2 # work per stage
     num_stages = total_work/stage_work
     num_stages = np.ceil(num_stages)
+
+    mach2 = np.sqrt(2/(gamma-1)*((densityt2*inlet_flow_area*gamma*R_air*Tt2/massflow2)**((gamma-1)/gamma)-1)) # should be between .5 and .55 for conditions in assignment
+
+    return (spool_speed_rpm, num_stages, compressor_length)
 
 def engine_configuration(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, gamma_hot):
     Tt0, Pt0 = ambient_properties(mach0, Tambient, Pambient)
@@ -273,5 +277,5 @@ def main():
     
 if __name__ == '__main__':
     # main()
-    compressor_design()
+    print(compressor_design())
     
