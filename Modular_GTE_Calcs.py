@@ -126,7 +126,7 @@ def compressor_design(gamma=1.4, R_air=287.05):
     avg_velocity = spool_speed * avg_pitch_diam/2
     avg_blade_width = avg_blade_height/aspect_ratio
     avg_gap = .25*avg_blade_width
-    compressor_length = 6*(2*avg_blade_width+avg_gap) + 5*avg_gap # 6 rotor-stator stages + 11 gaps in between all of the rotors and stators
+    compressor_length = 6*(2*avg_blade_width+avg_gap) + 5*avg_gap # 6 rotors, 6 stators, 11 gaps in between all of the rotors and stators
 
     stage_work = work_coeff*avg_velocity**2/2 # work per stage
     num_stages = total_work/stage_work
