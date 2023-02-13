@@ -79,10 +79,14 @@ def combustor(Tt31, Tt4, m31, LHV, comb_eff, gamma_hot, gamma_cold=1.4, R_air=28
     cp_cold = gamma_cold*R_air/(gamma_cold-1)
     cp_hot = gamma_hot*R_air/(gamma_hot-1)
     
-    mfuel = (m31*cp_cold*Tt31 - m31*cp_hot*Tt4)/(cp_hot*Tt4 - LHV)
-    fuel_air_ratio = (cp_hot*Tt4 - cp_cold*Tt31)/(LHV*comb_eff - cp_hot*Tt4)
+    mfuel = (m31*cp_cold*Tt31 - m31*cp_hot*Tt4)/(cp_hot*Tt4 - LHV) # Does not take into account combustor efficieny, i.e efficiency = 1
+    fuel_air_ratio = (cp_hot*Tt4 - cp_cold*Tt31)/(LHV*comb_eff - cp_hot*Tt4) # Does take into account efficiency
     
     return fuel_air_ratio
+
+def nozzle(Tt, Pt, pressure_ratio):
+    # efficiency = 
+    pass
 
 def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0AHL:float, mach_throat:float, Tt0:float, Pt0:float, Ts1:float, Ps1:float, mach_fan:float, diffuser_angle:float, gamma:float=1.4, R_air:float=287.05):
 
@@ -289,6 +293,6 @@ def assignment6():
 if __name__ == '__main__':
     Ts3max = 450 # F
     dFrame = engine_configurations()
-    engine_config_plots(dFrame, [7, 9, 9], Ts3max, 0, 0)
+    # engine_config_plots(dFrame, [7, 9, 9], Ts3max, 0, 0)
     # print(assignment5(dFrame))
-    # print(assignment6())
+    print(assignment6())
