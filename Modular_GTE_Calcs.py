@@ -125,6 +125,7 @@ def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, tot
     total_area = np.pi*max_tip_diam**2/4 # total cross sectional area of the compressor
     spool_speed = (max_tip_speed)/(max_tip_diam/2) # rad/s
     spool_speed_rpm = spool_speed*(1/(2*np.pi))*(60/1) # rpm
+    gap_width_ratio = .25
     
     densityt2 = Pt2/(R_air*Tt2)
     Ts31 = isenf.T(mach31, Tt31)
@@ -148,12 +149,12 @@ def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, tot
     avg_blade_height = (inlet_blade_height + outlet_blade_height)/2
     avg_velocity = spool_speed * avg_pitch_diam/2
     avg_blade_width = avg_blade_height/aspect_ratio
-    avg_gap = .25*avg_blade_width
-    compressor_length = 6*(2*avg_blade_width+avg_gap) + 5*avg_gap # 6 rotors, 6 stators, 11 gaps in between all of the rotors and stators
-
+    avg_gap = gap_width_ratio*avg_blade_width
+    
     stage_work = work_coeff*avg_velocity**2/2 # work per stage
     num_stages = total_work/stage_work
     num_stages = np.ceil(num_stages)
+    compressor_length = 2*num_stages*avg_blade_width + (2*num_stages-1)*avg_gap # 6 rotors, 6 stators, 11 gaps in between all of the rotors and stators
 
     mach2 = np.sqrt(2/(gamma-1)*((densityt2*inlet_flow_area*gamma*R_air*Tt2/massflow2)**((gamma-1)/gamma)-1)) # should be between .5 and .55 for conditions in assignment
     Ts2 = isenf.T(mach2, Tt2)
@@ -161,7 +162,7 @@ def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, tot
     densitys2 = isenf.density(mach2, densityt2)
     velocity2 = mach2*np.sqrt(gamma*R_air*Ts2)
 
-    return ((mach2, Ts2, Ps2, densitys2, velocity2), spool_speed_rpm, num_stages, compressor_length)
+    return ((mach2, Ts2, Ps2, densitys2, velocity2), (inlet_hub_radius*2, outlet_hub_diam, avg_gap, avg_blade_height), spool_speed_rpm, num_stages, compressor_length)
 
 def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, gamma_hot):
     Tt0, Pt0 = ambient_properties(mach0, Tambient, Pambient)
@@ -295,4 +296,6 @@ if __name__ == '__main__':
     dFrame = engine_configurations()
     # engine_config_plots(dFrame, [7, 9, 9], Ts3max, 0, 0)
     # print(assignment5(dFrame))
-    print(assignment6())
+    ans6 = assignment6()
+    print(ans6[0][0], ans6[1][0]/.0254, ans6[1][1]/.0254, ans6[1][2]/.0254, ans6[1][3]/.0254)
+    print(ans6[2], ans6[3], ans6[4]/.0254)
