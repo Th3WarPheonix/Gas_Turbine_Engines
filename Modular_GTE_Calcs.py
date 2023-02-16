@@ -6,33 +6,35 @@ import pandas as pd
 
 def convert_temps(temps, to):
     """Convert the temperature from K to R"""
+    con_factor = 1.8
     if to == 'emp':
         try:
-            temps *= 1.8
+            temps *= con_factor
             return temps
         except:
-            return np.array(temps)*1.8
+            return np.array(temps)*con_factor
     elif to == 'SI':
         try:
-            temps = temps/1.8
+            temps = temps/con_factor
             return temps
         except:
-            return np.array(temps)/1.8
+            return np.array(temps)/con_factor
 
 def convert_pressures(pressures, to):
     """Convert the pressure from Pa to psia"""
+    con_factor = 6895.0
     if to == 'emp':
         try:
-            pressures = pressures/6895
+            pressures = pressures/con_factor
             return pressures
         except:
-            return np.array(pressures)/6895
+            return np.array(pressures)/con_factor
     elif to == 'SI':
         try:
-            pressures = pressures*6895.0
+            pressures = pressures*con_factor
             return pressures
         except:
-            return np.array(pressures)*6895.0
+            return np.array(pressures)*con_factor
 
 def convert_work(works, to):
     """Convert the work from J to Btu"""
@@ -125,44 +127,51 @@ def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, tot
     total_area = np.pi*max_tip_diam**2/4 # total cross sectional area of the compressor
     spool_speed = (max_tip_speed)/(max_tip_diam/2) # rad/s
     spool_speed_rpm = spool_speed*(1/(2*np.pi))*(60/1) # rpm
-    gap_width_ratio = .25
-    
+    gap_width_ratio = .25 # gap width to blade width ratio
+    print('compressor rpm', spool_speed_rpm)
     densityt2 = Pt2/(R_air*Tt2)
+
     Ts31 = isenf.T(mach31, Tt31)
-    velocity31 = np.sqrt(gamma*R_air*Ts31)
+
+    velocity31 = mach31*np.sqrt(gamma*R_air*Ts31)
     densityt31 = Pt31/(R_air*Tt31)
     densitys31 = isenf.density(mach31, densityt31)
-
-    inlet_blade_height = max_tip_diam/(2*(1+inlet_radius_ratio))
-    inlet_hub_radius = inlet_blade_height*inlet_radius_ratio
+    print(velocity31/.0254)
+    inlet_blade_height = max_tip_diam/2*(1-inlet_radius_ratio)
+    inlet_hub_radius = max_tip_diam/2*inlet_radius_ratio 
     inlet_hub_area = np.pi*inlet_hub_radius**2
     inlet_flow_area = total_area - inlet_hub_area
-
-    outlet_flow_area = massflow31/densitys31/velocity31
+    print('Hub diam 2 inches', inlet_hub_radius/.0254*2)
+    outlet_flow_area = massflow31/(densitys31*velocity31)
+    print(densitys31)
+    print(outlet_flow_area/.0254/.0254)
     outlet_hub_area = total_area - outlet_flow_area
     outlet_hub_diam = np.sqrt(outlet_hub_area*4/np.pi)
     outlet_blade_height = (max_tip_diam - outlet_hub_diam)/2
-
+    print('Hub diam 31 inches', outlet_hub_diam/.0254)
+    avg_blade_height = (inlet_blade_height + outlet_blade_height)/2
+    avg_blade_width = avg_blade_height/aspect_ratio
+    avg_gap = gap_width_ratio*avg_blade_width
     avg_pitch_diam2  = (max_tip_diam + inlet_hub_radius*2)/2
     avg_pitch_diam31 = (max_tip_diam + outlet_hub_diam)/2
     avg_pitch_diam = (avg_pitch_diam2 + avg_pitch_diam31)/2
-    avg_blade_height = (inlet_blade_height + outlet_blade_height)/2
     avg_velocity = spool_speed * avg_pitch_diam/2
-    avg_blade_width = avg_blade_height/aspect_ratio
-    avg_gap = gap_width_ratio*avg_blade_width
-    
+    print('Avg blade height inches', avg_blade_height/.0254)
+    print('Avg blade width inches', avg_blade_width/.0254)
+    print('Gap length inches', avg_gap/.0254)
     stage_work = work_coeff*avg_velocity**2/2 # work per stage
     num_stages = total_work/stage_work
     num_stages = np.ceil(num_stages)
     compressor_length = 2*num_stages*avg_blade_width + (2*num_stages-1)*avg_gap # 6 rotors, 6 stators, 11 gaps in between all of the rotors and stators
-
+    print('num stages', num_stages)
+    print('Compressor length inches', compressor_length/.0254)
     mach2 = np.sqrt(2/(gamma-1)*((densityt2*inlet_flow_area*gamma*R_air*Tt2/massflow2)**((gamma-1)/gamma)-1)) # should be between .5 and .55 for conditions in assignment
     Ts2 = isenf.T(mach2, Tt2)
     Ps2 = isenf.p(mach2, Pt2)
     densitys2 = isenf.density(mach2, densityt2)
     velocity2 = mach2*np.sqrt(gamma*R_air*Ts2)
-
-    return ((mach2, Ts2, Ps2, densitys2, velocity2), (inlet_hub_radius*2, outlet_hub_diam, avg_gap, avg_blade_height), spool_speed_rpm, num_stages, compressor_length)
+    
+    return ((inlet_hub_radius*2, outlet_hub_diam, avg_gap, avg_blade_height), spool_speed_rpm, num_stages, compressor_length)
 
 def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, gamma_hot):
     Tt0, Pt0 = ambient_properties(mach0, Tambient, Pambient)
@@ -297,5 +306,3 @@ if __name__ == '__main__':
     # engine_config_plots(dFrame, [7, 9, 9], Ts3max, 0, 0)
     # print(assignment5(dFrame))
     ans6 = assignment6()
-    print(ans6[0][0], ans6[1][0]/.0254, ans6[1][1]/.0254, ans6[1][2]/.0254, ans6[1][3]/.0254)
-    print(ans6[2], ans6[3], ans6[4]/.0254)
