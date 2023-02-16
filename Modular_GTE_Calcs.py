@@ -128,7 +128,7 @@ def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, tot
     spool_speed = (max_tip_speed)/(max_tip_diam/2) # rad/s
     spool_speed_rpm = spool_speed*(1/(2*np.pi))*(60/1) # rpm
     gap_width_ratio = .25 # gap width to blade width ratio
-    print('compressor rpm', spool_speed_rpm)
+
     densityt2 = Pt2/(R_air*Tt2)
 
     Ts31 = isenf.T(mach31, Tt31)
@@ -136,19 +136,18 @@ def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, tot
     velocity31 = mach31*np.sqrt(gamma*R_air*Ts31)
     densityt31 = Pt31/(R_air*Tt31)
     densitys31 = isenf.density(mach31, densityt31)
-    print(velocity31/.0254)
+
     inlet_blade_height = max_tip_diam/2*(1-inlet_radius_ratio)
     inlet_hub_radius = max_tip_diam/2*inlet_radius_ratio 
     inlet_hub_area = np.pi*inlet_hub_radius**2
     inlet_flow_area = total_area - inlet_hub_area
-    print('Hub diam 2 inches', inlet_hub_radius/.0254*2)
+
     outlet_flow_area = massflow31/(densitys31*velocity31)
-    print(densitys31)
-    print(outlet_flow_area/.0254/.0254)
+
     outlet_hub_area = total_area - outlet_flow_area
     outlet_hub_diam = np.sqrt(outlet_hub_area*4/np.pi)
     outlet_blade_height = (max_tip_diam - outlet_hub_diam)/2
-    print('Hub diam 31 inches', outlet_hub_diam/.0254)
+
     avg_blade_height = (inlet_blade_height + outlet_blade_height)/2
     avg_blade_width = avg_blade_height/aspect_ratio
     avg_gap = gap_width_ratio*avg_blade_width
@@ -156,15 +155,12 @@ def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, tot
     avg_pitch_diam31 = (max_tip_diam + outlet_hub_diam)/2
     avg_pitch_diam = (avg_pitch_diam2 + avg_pitch_diam31)/2
     avg_velocity = spool_speed * avg_pitch_diam/2
-    print('Avg blade height inches', avg_blade_height/.0254)
-    print('Avg blade width inches', avg_blade_width/.0254)
-    print('Gap length inches', avg_gap/.0254)
+
     stage_work = work_coeff*avg_velocity**2/2 # work per stage
     num_stages = total_work/stage_work
     num_stages = np.ceil(num_stages)
     compressor_length = 2*num_stages*avg_blade_width + (2*num_stages-1)*avg_gap # 6 rotors, 6 stators, 11 gaps in between all of the rotors and stators
-    print('num stages', num_stages)
-    print('Compressor length inches', compressor_length/.0254)
+
     mach2 = np.sqrt(2/(gamma-1)*((densityt2*inlet_flow_area*gamma*R_air*Tt2/massflow2)**((gamma-1)/gamma)-1)) # should be between .5 and .55 for conditions in assignment
     Ts2 = isenf.T(mach2, Tt2)
     Ps2 = isenf.p(mach2, Pt2)
