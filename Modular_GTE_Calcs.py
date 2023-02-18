@@ -313,7 +313,7 @@ def assignment6():
 
     return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
 
-def compressor_vel_diagrams(Tt1, Pt1, massflow, press_ratio, num_stages, Dp1, spool_speed, stage_eff, reaction, gamma=1.4, R_air=287.05):
+def compressor_vel_diagrams(Tt1, Pt1, massflow, press_ratio, num_stages, Dp1, Dp2, spool_speed, stage_eff, reaction, gamma=1.4, R_air=287.05):
     '''Calculations are acrosss one stage of a compressor. The subscripts denote stations across the stage.
     Station 1 is before the rotor, station 2 is between the rotor and the stator, station 3 is after the stator.
     c = cz + ctj = axial flow + azimuthal flow.
@@ -322,6 +322,7 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, press_ratio, num_stages, Dp1, sp
     cp_air = gamma*R_air/(gamma-1)
     Pt3_req = Pt1 * press_ratio**(1/num_stages)
     spool_speed1 = spool_speed*Dp1/2
+    spool_speed2 = spool_speed*Dp2/2
 
     delta_ct = ((Pt3_req/Pt1)**((gamma-1)/gamma)-1)/stage_eff*cp_air*Tt1/spool_speed1 # change in c theta across the rotor
     Tt3 = ((Pt3_req/Pt1)**((gamma-1)/gamma)-1)*Tt1 + Tt1
@@ -371,7 +372,7 @@ def assignment7():
 
     spool_speed = spool_speed_rpm*2*np.pi/60
 
-    compressor_vel_diagrams(Tt1, Pt1, massflow1, comp_press_ratio, num_stages, Dp1, spool_speed, stage_eff, reaction)
+    compressor_vel_diagrams(Tt1, Pt1, massflow1, comp_press_ratio, num_stages, Dp1, Dp2, spool_speed, stage_eff, reaction)
 
 
 
