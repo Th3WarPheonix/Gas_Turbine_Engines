@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import IsentropicFlow as isenf
 import pandas as pd
+import RootFinding as rootfind
 
 def convert_temps(temps, to:str):
     """Convert the temperature from K to R"""
@@ -140,6 +141,12 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
 
     return np.array([streamtube_diameter, highlight_diameter, throat_diameter, fan_diameter]), diffuser_length, diffuser_length/throat_diameter
 
+def find_area(mach, massflow, densityt, Tt, area, gamma=1.4, R=287.05):
+    densitys = isenf.density(mach, densityt)
+    Ts = isenf.T(mach, Tt)
+    sound_speed = np.sqrt(gamma*R*Ts)
+    return massflow/densitys/mach/sound_speed - area
+
 def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31, gamma=1.4, R_air=287.05):
     total_area = np.pi*max_tip_diam**2/4 # total cross sectional area of the compressor
     spool_speed = (max_tip_speed)/(max_tip_diam/2) # rad/s
@@ -178,7 +185,7 @@ def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, tot
     num_stages = np.ceil(num_stages)
     compressor_length = 2*num_stages*avg_blade_width + (2*num_stages-1)*avg_gap # 6 rotors, 6 stators, 11 gaps in between all of the rotors and stators
 
-    mach2 = np.sqrt(2/(gamma-1)*((densityt2*inlet_flow_area*gamma*R_air*Tt2/massflow2)**((gamma-1)/gamma)-1)) # should be between .5 and .55 for conditions in assignment
+    mach2 = rootfind.newton2(find_area, .469, massflow=massflow2, densityt=densityt2, Tt=Tt2, area=inlet_flow_area)
     Ts2 = isenf.T(mach2, Tt2)
     Ps2 = isenf.p(mach2, Pt2)
     densitys2 = isenf.density(mach2, densityt2)
@@ -313,34 +320,61 @@ def assignment6():
 
     return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
 
-def compressor_vel_diagrams(Tt1, Pt1, massflow, press_ratio, num_stages, Dp1, Dp2, spool_speed, stage_eff, reaction, gamma=1.4, R_air=287.05):
+def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages, Dt1, Dp1, Dp2, flow_area3, spool_speed, stage_eff, reaction, gamma=1.4, R_air=287.05):
     '''Calculations are acrosss one stage of a compressor. The subscripts denote stations across the stage.
     Station 1 is before the rotor, station 2 is between the rotor and the stator, station 3 is after the stator.
     c = cz + ctj = axial flow + azimuthal flow.
     c is absolute velocity.
     w is realtive to the rotor.'''
     cp_air = gamma*R_air/(gamma-1)
-    Pt3_req = Pt1 * press_ratio**(1/num_stages)
     spool_speed1 = spool_speed*Dp1/2
-    spool_speed2 = spool_speed*Dp2/2
+    
+    hub_diam1 = 2*Dp1 - Dt1
+    hub_area1 = np.pi*hub_diam1**2/4
+    flow_area1 = np.pi*Dt1**2/4 - hub_area1
 
-    delta_ct = ((Pt3_req/Pt1)**((gamma-1)/gamma)-1)/stage_eff*cp_air*Tt1/spool_speed1 # change in c theta across the rotor
-    Tt3 = ((Pt3_req/Pt1)**((gamma-1)/gamma)-1)*Tt1 + Tt1
+    hub_diam2 = 2*Dp2 - Dt1
+    hub_area2 = np.pi*hub_diam2**2/4
+    flow_area2 = np.pi*Dt1**2/4 - hub_area2
+
+    densityt1 = Pt1/R_air/Tt1
+    mach1 = rootfind.newton2(find_area, .5, massflow=massflow, densityt=densityt1, Tt=Tt1, area=flow_area1)
+    Ts1 = isenf.T(mach1, Tt1)
+    Ps1 = isenf.p(mach1, Pt1)
+    sound_speed1 = np.sqrt(gamma*R_air*Ts1)
+    air_vel1 = mach1*sound_speed1
+
+    c1 = air_vel1*np.cos(alpha1) + air_vel1*np.sin(alpha1)*1j
+    w1 = c1 - spool_speed1*1j
+    beta1 = np.arctan(np.imag(w1)/np.real(w1))
+    
+    Pt3 = Pt1 * press_ratio**(1/num_stages)
+    Tt3 = ((Pt3/Pt1)**((gamma-1)/gamma)-1)*Tt1 + Tt1
+    densityt3 = Pt3/R_air/Tt3
+    delta_ct = ((Pt3/Pt1)**((gamma-1)/gamma)-1)/stage_eff*cp_air*Tt1/spool_speed1 # change in c theta across the rotor
+    
+    mach3 = rootfind.newton2(find_area, .5, massflow=massflow, densityt=densityt3, Tt=Tt3, area=flow_area3)
+    Ts3 = isenf.T(mach3, Tt3)
+
+    Ts2 = reaction*(Tt3-Tt1) + Ts1
+
     work_stage = spool_speed1*delta_ct*massflow
 
-    ct1 = 0
-    wt1 = ct1 + spool_speed
-    Ts2 = reaction*(Tt3-Tt1) + Ts1
-    wt2 = -2*reaction*spool_speed-wt1
-
-    c1 = 5 + 2j
     c2 = c1 + delta_ct*1j
-    w1 = c1 + spool_speed1*1j
-    beta1 = np.arctan(np.imag(w1)/np.real(w1))
-    sound_speed1 = np.sqrt(gamma*R_air*Tt1)
-    vel1 = np.abs(w1)
-    Ps1 = isenf.p(vel1/sound_speed1, Pt1)
+    beta2 = np.arctan(-2*(reaction-0.5)*spool_speed1/np.real(c2)-np.tan(alpha1))
+    w2 = c2 + spool_speed1*1j
         
+    print(c1, w1, c2, w2, np.arctan(np.imag(w2)/np.real(c2)))
+    plt.axhline(0)
+    plt.plot([0,np.real(c1)], [0, np.imag(c1)], label='c1', linewidth=3, color='red')
+    plt.plot([0,np.real(w1)], [0, np.imag(w1)], label='w1', linewidth=3, color='red', linestyle='--')
+    plt.plot([0,np.real(c2)], [0, np.imag(c2)], label='c2', color='blue')
+    plt.plot([0,np.real(w2)], [0, np.imag(w2)], label='w2', color='blue', linestyle='--')
+    plt.plot([np.real(c1), np.real(c1)], [np.imag(c1), np.imag(c1)-spool_speed1], label='Spool1', color='red', linestyle=':')
+    plt.plot([np.real(w2), np.real(w2)], [np.imag(w2), np.imag(w2)-spool_speed1], label='Spool2', color='blue', linestyle=':')
+    plt.legend()
+    plt.show()
+
 def assignment7():
     Tt1 = 464.5 # R
     Pt1 = 6.58 # psia
@@ -370,9 +404,9 @@ def assignment7():
     area3 = area3*.0254**2
     alpha3 = alpha3 * np.pi/180
 
-    spool_speed = spool_speed_rpm*2*np.pi/60
-
-    compressor_vel_diagrams(Tt1, Pt1, massflow1, comp_press_ratio, num_stages, Dp1, Dp2, spool_speed, stage_eff, reaction)
+    spool_speed_rads = spool_speed_rpm*2*np.pi/60
+        
+    compressor_vel_diagrams(Tt1, Pt1, massflow1, alpha1, comp_press_ratio, num_stages, Dt1, Dp1, Dp2, area3, spool_speed_rads, stage_eff, reaction)
 
 
 
