@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import IsentropicFlow as isenf
 import pandas as pd
 
-def convert_temps(temps, to):
+def convert_temps(temps, to:str):
     """Convert the temperature from K to R"""
     con_factor = 1.8
     if to == 'emp':
@@ -20,7 +20,24 @@ def convert_temps(temps, to):
         except:
             return np.array(temps)/con_factor
 
-def convert_pressures(pressures, to):
+def convert_mass(mass, to:str):
+    """Convert the temperature from lbm to kg"""
+    con_factor = 2.20462
+    if to == 'emp':
+        try:
+            mass *= con_factor
+            return mass
+        except:
+            return np.array(mass)*con_factor
+    elif to == 'SI':
+        try:
+            mass = mass/con_factor
+            return mass
+        except:
+            return np.array(mass)/con_factor
+
+
+def convert_pressures(pressures, to:str):
     """Convert the pressure from Pa to psia"""
     con_factor = 6895.0
     if to == 'emp':
@@ -36,7 +53,7 @@ def convert_pressures(pressures, to):
         except:
             return np.array(pressures)*con_factor
 
-def convert_work(works, to):
+def convert_work(works, to:str):
     """Convert the work from J to Btu"""
     if to == 'emp':
         try:
@@ -296,9 +313,72 @@ def assignment6():
 
     return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
 
+def compressor_vel_diagrams(Tt1, Pt1, massflow, press_ratio, num_stages, Dp1, spool_speed, stage_eff, reaction, gamma=1.4, R_air=287.05):
+    '''Calculations are acrosss one stage of a compressor. The subscripts denote stations across the stage.
+    Station 1 is before the rotor, station 2 is between the rotor and the stator, station 3 is after the stator.
+    c = cz + ctj = axial flow + azimuthal flow.
+    c is absolute velocity.
+    w is realtive to the rotor.'''
+    cp_air = gamma*R_air/(gamma-1)
+    Pt3_req = Pt1 * press_ratio**(1/num_stages)
+    spool_speed1 = spool_speed*Dp1/2
+
+    delta_ct = ((Pt3_req/Pt1)**((gamma-1)/gamma)-1)/stage_eff*cp_air*Tt1/spool_speed1 # change in c theta across the rotor
+    Tt3 = ((Pt3_req/Pt1)**((gamma-1)/gamma)-1)*Tt1 + Tt1
+    work_stage = spool_speed1*delta_ct*massflow
+
+    ct1 = 0
+    wt1 = ct1 + spool_speed
+    Ts2 = reaction*(Tt3-Tt1) + Ts1
+    wt2 = -2*reaction*spool_speed-wt1
+
+    c1 = 5 + 2j
+    c2 = c1 + delta_ct*1j
+    w1 = c1 + spool_speed1*1j
+    beta1 = np.arctan(np.imag(w1)/np.real(w1))
+    sound_speed1 = np.sqrt(gamma*R_air*Tt1)
+    vel1 = np.abs(w1)
+    Ps1 = isenf.p(vel1/sound_speed1, Pt1)
+        
+def assignment7():
+    Tt1 = 464.5 # R
+    Pt1 = 6.58 # psia
+    massflow1 = 70.17 # lbm/s
+    Dp1 = 20.71 # in
+    Dt1 = 29.58 # in
+    alpha1 = 0 # deg
+
+    Dp2 = 21.37 # in
+
+    area3 = 522.1 # in^2
+    alpha3 = 0 # deg
+
+    spool_speed_rpm = 11619 # rpm
+    reaction = .5
+    stage_eff = .87
+    comp_press_ratio = 8
+    num_stages = 6
+
+    Tt1 = convert_temps(Tt1, "SI")
+    Pt1 = convert_pressures(Pt1, "SI")
+    massflow1 = convert_mass(massflow1, "SI")
+    Dp1 = Dp1 * .0254
+    Dt1 = Dt1 * .0254
+    alpha1 = alpha1 * np.pi/180
+    Dp2 = Dp2 * .0254
+    area3 = area3*.0254**2
+    alpha3 = alpha3 * np.pi/180
+
+    spool_speed = spool_speed_rpm*2*np.pi/60
+
+    compressor_vel_diagrams(Tt1, Pt1, massflow1, comp_press_ratio, num_stages, Dp1, spool_speed, stage_eff, reaction)
+
+
+
 if __name__ == '__main__':
     Ts3max = 450 # F
-    dFrame = engine_configurations()
+    # dFrame = engine_configurations()
     # engine_config_plots(dFrame, [7, 9, 9], Ts3max, 0, 0)
     # print(assignment5(dFrame))
-    ans6 = assignment6()
+    # ans6 = assignment6()
+    assignment7()
