@@ -351,8 +351,8 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     beta1 = np.arctan(np.imag(w1)/np.real(w1))
 
     Ttr1 = Ts1 + np.abs(w1)**2/2/cp_air
-    Ttr2 = Ttr1 - spool_speed1**2/2/cp_air + spool_speed2**2/2/cp_air 
-    
+    Ttr2 = Ttr1 - spool_speed1**2/2/cp_air + spool_speed2**2/2/cp_air
+
     Pt3 = Pt1 * press_ratio**(1/num_stages)
     Tt3 = ((Pt3/Pt1)**((gamma-1)/gamma)-1)*Tt1 + Tt1
     densityt3 = Pt3/R_air/Tt3
@@ -365,11 +365,11 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     delta_ct = ((Pt3/Pt1)**((gamma-1)/gamma)-1)/stage_eff*cp_air*Tt1/spool_speed1 # change in c theta across the rotor
     work_stage = spool_speed1*delta_ct*massflow
 
+    c2 = c1 + delta_ct*1j
     Pt2 = Pt1 - .5*loss_coeff_r*densitys1*air_vel1**2
     Ts2 = reaction*(Tt3-Tt1) + Ts1
+    sound_speed2 = np.sqrt(gamma*R_air*Ts2)
     w2_mag = np.sqrt(2*(Ttr2 - Ts2)*cp_air)
-
-    c2 = c1 + delta_ct*1j
     beta2 = np.arctan(-2*(reaction-0.5)*spool_speed1/np.real(c2)-np.tan(alpha1))
     w2 = w2_mag*np.cos(beta2) + w2_mag*np.sin(beta2)*1j
     print(beta2)
