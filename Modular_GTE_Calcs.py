@@ -320,7 +320,7 @@ def assignment6():
 
     return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
 
-def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages, Dt1, Dp1, Dp2, flow_area3, spool_speed, stage_eff, loss_coeff_r, loss_coeff_s, reaction, gamma=1.4, R_air=287.05):
+def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages, Dt1, Dp1, Dp2, flow_area3, spool_speed, stage_eff, loss_coeffr, loss_coeffs, reaction, gamma=1.4, R_air=287.05):
     '''Calculations are acrosss one stage of a compressor. The subscripts denote stations across the stage.
     Station 1 is before the rotor, station 2 is between the rotor and the stator, station 3 is after the stator.
     c = cz + ctj = axial flow + azimuthal flow.
@@ -353,7 +353,24 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     Ttr1 = Ts1 + np.abs(w1)**2/2/cp_air
     Ttr2 = Ttr1 - spool_speed1**2/2/cp_air + spool_speed2**2/2/cp_air
 
+    beta2 = np.arctan(-2*(reaction-0.5)*spool_speed1/np.real(c1)-np.tan(alpha1))
+    w2t = -2*reaction*spool_speed1 - np.imag(w1)
+    w2z = w2t/np.tan(beta2)
+    w2 = w2z + w2z*1j
+    c2 = w2 + spool_speed1*1j
+    alpha2 = np.arctan(np.imag(c2)/ np.real(c2))
+    c2_mag = np.abs(c2)
+    Pt2 = Pt1 - .5*loss_coeffr*densitys1*np.abs(w1)**2
+    
+    machz = np.real(c1)/sound_speed1
+    macht = spool_speed1/sound_speed1
+    bottom = 1/macht**2 + (gamma-1)/(2*np.cos(alpha1)*np.cos(alpha1))*(machz/macht)**2
+    first = (gamma-1)/bottom
+    second = 1 + (machz/macht)*(np.tan(beta2)-np.tan(alpha1))
+    Tt2 = (1 + first*second)*Tt1
+
     Pt3 = Pt1 * press_ratio**(1/num_stages)
+    # Pt3 = Pt2 - .5*loss_coeffs*densitys2*np.abs(c2)**2
     Tt3 = ((Pt3/Pt1)**((gamma-1)/gamma)-1)*Tt1 + Tt1
     densityt3 = Pt3/R_air/Tt3
     mach3 = rootfind.newton2(find_area, .5, massflow=massflow, densityt=densityt3, Tt=Tt3, area=flow_area3)
@@ -362,28 +379,23 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     sound_speed3 = np.sqrt(gamma*R_air*Ts3)
     air_vel3 = mach3*sound_speed3
 
-    delta_ct = ((Pt3/Pt1)**((gamma-1)/gamma)-1)/stage_eff*cp_air*Tt1/spool_speed1 # change in c theta across the rotor
+    delta_ct = ((Pt3/Pt1)**((gamma-1)/gamma)-1)*cp_air*Tt1/spool_speed1 # change in c theta across the rotor
     work_stage = spool_speed1*delta_ct*massflow
 
-    c2 = c1 + delta_ct*1j
-    Pt2 = Pt1 - .5*loss_coeff_r*densitys1*air_vel1**2
     Ts2 = reaction*(Tt3-Tt1) + Ts1
-    sound_speed2 = np.sqrt(gamma*R_air*Ts2)
-    w2_mag = np.sqrt(2*(Ttr2 - Ts2)*cp_air)
-    beta2 = np.arctan(-2*(reaction-0.5)*spool_speed1/np.real(c2)-np.tan(alpha1))
-    w2 = w2_mag*np.cos(beta2) + w2_mag*np.sin(beta2)*1j
-    print(beta2)
-    print(w2_mag)
-        
-    print(c1, w1, c2, w2, delta_ct)
-    plt.axhline(0)
-    plt.plot([0,np.real(c1)], [0, np.imag(c1)], label='c1', linewidth=3, color='red')
-    plt.plot([0,np.real(w1)], [0, np.imag(w1)], label='w1', linewidth=3, color='red', linestyle='--')
-    plt.plot([0,np.real(c2)], [0, np.imag(c2)], label='c2', color='blue')
-    plt.plot([0,np.real(w2)], [0, np.imag(w2)], label='w2', color='blue', linestyle='--')
-    plt.plot([np.real(c1), np.real(c1)], [np.imag(c1), np.imag(c1)-spool_speed1], label='Spool1', color='red', linestyle=':')
-    plt.plot([np.real(w2), np.real(w2)], [np.imag(w2), np.imag(w2)-spool_speed1], label='Spool2', color='blue', linestyle=':')
-    plt.legend()
+
+    fig, (axs1, axs2) = plt.subplots(1, 2)
+    axs1.axhline(y=0)
+    axs1.plot([0,np.real(c1)], [0, np.imag(c1)], label='c1', color='blue')
+    axs1.plot([0,np.real(w1)], [0, np.imag(w1)], label='w1', color='red')
+    axs1.plot([np.real(c1), np.real(c1)], [np.imag(c1), np.imag(c1)-spool_speed1], label='Spool1', color='green')
+    axs1.legend()
+
+    axs2.axhline(0)
+    axs2.plot([0,np.real(c2)], [0, np.imag(c2)], label='c2', color='blue')
+    axs2.plot([0,np.real(w2)], [0, np.imag(w2)], label='w2', color='red')
+    axs2.plot([np.real(w2), np.real(w2)], [np.imag(w2), np.imag(w2)+spool_speed1], label='Spool2', color='green')
+    axs2.legend()
     plt.show()
 
 def assignment7():
@@ -392,7 +404,7 @@ def assignment7():
     massflow1 = 70.17 # lbm/s
     Dp1 = 20.71 # in
     Dt1 = 29.58 # in
-    alpha1 = 0 # deg
+    alpha1 = 1e-10 # deg
 
     Dp2 = 21.37 # in
 
@@ -420,7 +432,6 @@ def assignment7():
     spool_speed_rads = spool_speed_rpm*2*np.pi/60
         
     compressor_vel_diagrams(Tt1, Pt1, massflow1, alpha1, comp_press_ratio, num_stages, Dt1, Dp1, Dp2, area3, spool_speed_rads, stage_eff, loss_coeff_r, loss_coeff_s, reaction)
-
 
 
 if __name__ == '__main__':
