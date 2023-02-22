@@ -398,6 +398,29 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     axs2.legend()
     plt.show()
 
+def airfoil_count():
+    rotor_solidity = 1.3
+    rotor_pitch_diam = 20.75 * .0254
+    rotor_airfoil_width = 3.56 *.0254
+
+    stator_solidity = 1.2
+    stator_pitch_diam = 22*.0254
+    stator_airfoil_width = 3.3 *.0254
+
+    meanline_slope = 5.9 # deg
+
+    beta1 = 59.4*np.pi/180
+    beta2 = 43.3*np.pi/180
+    alpha2 = 25.2*np.pi/180
+    alpha3 = 0*np.pi/180
+
+    rotor_stagger_angle = (beta1 + beta2)/2
+
+    rotor_chord = rotor_airfoil_width/np.cos(rotor_stagger_angle)
+
+    rotor_num_airfoils  = np.pi*rotor_pitch_diam/pitch_spacing
+    stator_num_airfoils = np.pi*stator_pitch_diam/pitch_spacing
+
 def assignment7():
     Tt1 = 464.5 # R
     Pt1 = 6.58 # psia
