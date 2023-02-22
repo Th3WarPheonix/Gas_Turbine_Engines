@@ -399,11 +399,11 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     plt.show()
 
 def airfoil_count():
-    rotor_solidity = 1.3
+    rotor_solidity = 1.3 # chord/spacing
     rotor_pitch_diam = 20.75 * .0254
     rotor_airfoil_width = 3.56 *.0254
 
-    stator_solidity = 1.2
+    stator_solidity = 1.2 # chord/spacing
     stator_pitch_diam = 22*.0254
     stator_airfoil_width = 3.3 *.0254
 
@@ -415,11 +415,21 @@ def airfoil_count():
     alpha3 = 0*np.pi/180
 
     rotor_stagger_angle = (beta1 + beta2)/2
-
     rotor_chord = rotor_airfoil_width/np.cos(rotor_stagger_angle)
+    rotor_spacing = rotor_chord/rotor_solidity
+    rotor_num_airfoils  = np.pi*rotor_pitch_diam/rotor_spacing
 
-    rotor_num_airfoils  = np.pi*rotor_pitch_diam/pitch_spacing
-    stator_num_airfoils = np.pi*stator_pitch_diam/pitch_spacing
+    stator_stagger_angle = (beta1 + beta2)/2
+    stator_chord = stator_airfoil_width/np.cos(stator_stagger_angle)
+    stator_spacing = stator_chord/stator_solidity
+    stator_num_airfoils = np.pi*stator_pitch_diam/stator_spacing
+
+    camber_angle = alpha2 - alpha3
+    print('stator chord in {}'.format(stator_chord))
+    print('leading edge thickness in {}'.format(stator_chord))
+    print('trailing edge thickness in {}'.format(stator_chord))
+    print('camber angle {}'.format(camber_angle*180/np.pi))
+    
 
 def assignment7():
     Tt1 = 464.5 # R
