@@ -417,19 +417,24 @@ def airfoil_count():
     rotor_stagger_angle = (beta1 + beta2)/2
     rotor_chord = rotor_airfoil_width/np.cos(rotor_stagger_angle)
     rotor_spacing = rotor_chord/rotor_solidity
-    rotor_num_airfoils  = np.pi*rotor_pitch_diam/rotor_spacing
+    rotor_num_airfoils  = np.ceil(np.pi*rotor_pitch_diam/rotor_spacing)
+    rotor_camber_angle = beta1 - beta2
 
-    stator_stagger_angle = (beta1 + beta2)/2
+    stator_stagger_angle = (alpha2 + alpha3)/2
     stator_chord = stator_airfoil_width/np.cos(stator_stagger_angle)
     stator_spacing = stator_chord/stator_solidity
-    stator_num_airfoils = np.pi*stator_pitch_diam/stator_spacing
+    stator_num_airfoils = np.ceil(np.pi*stator_pitch_diam/stator_spacing)
+    stator_camber_angle = alpha2 - alpha3
 
-    camber_angle = alpha2 - alpha3
+    print('alpha2, alpha3 deg', alpha2*180/np.pi, alpha3*180/np.pi)
     print('stator chord in {}'.format(stator_chord))
     print('leading edge thickness in {}'.format(stator_chord))
     print('trailing edge thickness in {}'.format(stator_chord))
-    print('camber angle {}'.format(camber_angle*180/np.pi))
+    print('camber angle {}'.format(stator_camber_angle*180/np.pi))
     
+    num_airfoils = np.array([rotor_num_airfoils, stator_num_airfoils], dtype=int)
+    print(num_airfoils)
+    return num_airfoils
 
 def assignment7():
     Tt1 = 464.5 # R
@@ -473,4 +478,5 @@ if __name__ == '__main__':
     # engine_config_plots(dFrame, [7, 9, 9], Ts3max, 0, 0)
     # print(assignment5(dFrame))
     # ans6 = assignment6()
-    assignment7()
+    # assignment7()
+    airfoil_count()
