@@ -426,12 +426,12 @@ def airfoil_count():
     stator_num_airfoils = np.ceil(np.pi*stator_pitch_diam/stator_spacing)
     stator_camber_angle = alpha2 - alpha3
 
-    print('alpha2, alpha3 deg', alpha2*180/np.pi, alpha3*180/np.pi)
-    print('stator chord in {}'.format(stator_chord))
-    print('leading edge thickness in {}'.format(stator_chord))
-    print('trailing edge thickness in {}'.format(stator_chord))
-    print('camber angle {}'.format(stator_camber_angle*180/np.pi))
-    
+    print('alpha2, alpha3 deg \t', alpha2*180/np.pi, alpha3*180/np.pi)
+    print('stator chord in \t{}'.format(stator_chord/.0254))
+    print('leading edge thickness in \t{}'.format(.009*stator_chord/.0254))
+    print('trailing edge thickness in \t{}'.format(.009*stator_chord/.0254))
+    print('camber angle \t{}'.format(stator_camber_angle*180/np.pi))
+    print('thickness in \t{}'.format(.05*stator_chord/.0254))
     num_airfoils = np.array([rotor_num_airfoils, stator_num_airfoils], dtype=int)
     print(num_airfoils)
     return num_airfoils
