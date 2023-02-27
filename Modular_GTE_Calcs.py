@@ -380,7 +380,7 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     air_vel3 = mach3*sound_speed3
 
     delta_ct = ((Pt3/Pt1)**((gamma-1)/gamma)-1)*cp_air*Tt1/spool_speed1 # change in c theta across the rotor
-    work_stage = spool_speed1*delta_ct*massflow
+    work_stage = spool_speed1*delta_ct
 
     Ts2 = reaction*(Tt3-Tt1) + Ts1
 
