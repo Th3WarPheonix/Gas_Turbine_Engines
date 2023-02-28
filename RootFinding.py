@@ -13,8 +13,8 @@ def newton2(fcn, x1=0, precision=1e-6, goal=0, **kwargs):
     x2 = x1 + precision*10
     while abs(x2-x1)>precision:
         x1 = x2
-        y1 = (fcn(x1+delta, **kwargs)-fcn(x1, **kwargs))/delta
-        dx = (goal-fcn(x1, **kwargs))/y1
+        y1 = (fcn(x1+delta, **kwargs)[0]-fcn(x1, **kwargs)[0])/delta
+        dx = (goal-fcn(x1, **kwargs)[0])/y1
         x2 += dx
     return x2
 

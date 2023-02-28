@@ -8,7 +8,7 @@ import RootFinding as rootfind
 def convert_temps(temps, to:str):
     """Convert the temperature from K to R"""
     con_factor = 1.8
-    if to == 'emp':
+    if to == 'imp':
         try:
             temps *= con_factor
             return temps
@@ -24,7 +24,7 @@ def convert_temps(temps, to:str):
 def convert_mass(mass, to:str):
     """Convert the temperature from lbm to kg"""
     con_factor = 2.20462
-    if to == 'emp':
+    if to == 'imp':
         try:
             mass *= con_factor
             return mass
@@ -41,7 +41,7 @@ def convert_mass(mass, to:str):
 def convert_pressures(pressures, to:str):
     """Convert the pressure from Pa to psia"""
     con_factor = 6895.0
-    if to == 'emp':
+    if to == 'imp':
         try:
             pressures = pressures/con_factor
             return pressures
@@ -56,7 +56,7 @@ def convert_pressures(pressures, to:str):
 
 def convert_work(works, to:str):
     """Convert the work from J to Btu"""
-    if to == 'emp':
+    if to == 'imp':
         try:
             works = works / 1055 / 2.205
             return works
@@ -145,7 +145,37 @@ def find_area(mach, massflow, densityt, Tt, area, gamma=1.4, R=287.05):
     densitys = isenf.density(mach, densityt)
     Ts = isenf.T(mach, Tt)
     sound_speed = np.sqrt(gamma*R*Ts)
-    return massflow/densitys/mach/sound_speed - area
+    return (massflow/densitys/mach/sound_speed - area,)
+
+def find_c2z(c2z, w2t, Ptr2, Ttr2, massflow, flow_area2, gamma=1.4, R_air=287.05):
+    cp_air = gamma*R_air/(gamma-1)
+    w2z = c2z
+    w2 = w2z + w2t*1j
+    Ts2 = Ttr2 - np.abs(w2)**2/2/cp_air
+    Ps2 = Ptr2*(Ts2/Ttr2)**(gamma/(gamma-1))
+    densitys2 = Ps2/Ts2/R_air
+    cz2 = massflow/densitys2/flow_area2
+    return (cz2 - cz2,)
+
+def find_efficiency(stage_eff, c1, Tt1, Pt1, Pt3_req, spool_speed1, spool_speed2, Ptr2, Ttr2, massflow, flow_area2, loss_coeffs, gamma=1.4, R_air=287.05):
+    cp_air = gamma*R_air/(gamma-1)
+    delta_ct = ((Pt3_req/Pt1)**((gamma-1)/gamma)-1)*cp_air*Tt1/spool_speed1/stage_eff # change in c theta across the rotor
+        
+    c2z = np.real(c1)
+    c2t = np.imag(c1) + delta_ct
+    w2t = c2t - spool_speed2
+    # ans = rootfind.newton2(find_c2z, x1=133, w2t=w2t, Ptr2=Ptr2, Ttr2=Ttr2, massflow=massflow, flow_area2=flow_area2)
+    ans = 133
+    c2 = ans + c2t*1j
+    w2 = c2 - spool_speed2*1j
+
+    Ts2 = Ttr2 - np.abs(w2)**2/2/cp_air
+    Ps2 = Ptr2*(Ts2/Ttr2)**(gamma/(gamma-1))
+    densitys2 = Ps2/Ts2/R_air
+    Tt2 = Ts2 + np.abs(c2)**2/2/cp_air
+    Pt2 = Ps2*(Ts2/Tt2)**-(gamma/(gamma-1))  
+    Pt3 = Pt2 - loss_coeffs*densitys2*np.abs(c2)**2/2
+    return Pt3_req - Pt3, c2, w2
 
 def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31, gamma=1.4, R_air=287.05):
     total_area = np.pi*max_tip_diam**2/4 # total cross sectional area of the compressor
@@ -201,15 +231,15 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     Tt31 = Tt13a
     fuel_air_ratio = combustor(Tt31, Tt4, m31, LHV, comb_eff, gamma_hot)
 
-    temperautres_emps = convert_temps([Tambient, Tt0, Tt1, Ts1, Tt13i, Tt13a, Tt3i, Tt3a], 'emp')
+    temperautres_emps = convert_temps([Tambient, Tt0, Tt1, Ts1, Tt13i, Tt13a, Tt3i, Tt3a], 'imp')
     Ts0_emp, Tt0_emp, Tt1_emp, Ts1_emp, Tt13i_emp, Tt13a_emp, Tt3i_emp, Tt3a_emp = temperautres_emps
 
-    pressures_emps = convert_pressures([Pambient, Pt0, Pt1, Ps1, Pt13, Pt3], 'emp')
+    pressures_emps = convert_pressures([Pambient, Pt0, Pt1, Ps1, Pt13, Pt3], 'imp')
     Ps0_emp, Pt0_emp, Pt1_emp, Ps1_emp, Pt13_emp, Pt3_emp = pressures_emps
 
     Vel1_emp = Vel1 / 12 / .0254
 
-    works_emps = convert_work([Wfi, Wfa, Wci, Wca], 'emp')
+    works_emps = convert_work([Wfi, Wfa, Wci, Wca], 'imp')
     Wfi_emp, Wfa_emp, Wci_emp, Wca_emp = works_emps
 
     labels0 = np.array(['Total Temperature (R)', 'Static Temperature (R)', 'Total Pressure (psia)', 'Static Pressure (psia)', 'Mach'])
@@ -351,38 +381,74 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     beta1 = np.arctan(np.imag(w1)/np.real(w1))
 
     Ttr1 = Ts1 + np.abs(w1)**2/2/cp_air
+    Ptr1 = Ps1*(Ttr1/Ts1)**(gamma/(gamma-1))
+
     Ttr2 = Ttr1 - spool_speed1**2/2/cp_air + spool_speed2**2/2/cp_air
+    Ptr2 = Ptr1 - loss_coeffr*densitys1*np.abs(w1)**2/2
 
     beta2 = np.arctan(-2*(reaction-0.5)*spool_speed1/np.real(c1)-np.tan(alpha1))
-    w2t = -2*reaction*spool_speed1 - np.imag(w1)
-    w2z = w2t/np.tan(beta2)
-    w2 = w2z + w2z*1j
-    c2 = w2 + spool_speed1*1j
-    alpha2 = np.arctan(np.imag(c2)/ np.real(c2))
-    c2_mag = np.abs(c2)
-    Pt2 = Pt1 - .5*loss_coeffr*densitys1*np.abs(w1)**2
     
-    machz = np.real(c1)/sound_speed1
-    macht = spool_speed1/sound_speed1
-    bottom = 1/macht**2 + (gamma-1)/(2*np.cos(alpha1)*np.cos(alpha1))*(machz/macht)**2
-    first = (gamma-1)/bottom
-    second = 1 + (machz/macht)*(np.tan(beta2)-np.tan(alpha1))
-    Tt2 = (1 + first*second)*Tt1
+    Pt3_req = Pt1 * press_ratio**(1/num_stages)
+    stage_eff = rootfind.newton2(find_efficiency, stage_eff, c1=c1, Tt1=Tt1, Pt1=Pt1, Pt3_req=Pt3_req, spool_speed1=spool_speed1, spool_speed2=spool_speed2, Ptr2=Ptr2, Ttr2=Ttr2, massflow=massflow, flow_area2=flow_area2, loss_coeffs=loss_coeffs)
+    nan, c2, w2 = find_efficiency(stage_eff, c1, Tt1, Pt1, Pt3_req, spool_speed1, spool_speed2, Ptr2, Ttr2, massflow, flow_area2, loss_coeffs)
+    alpha2 = np.arctan(np.imag(c2)/np.real(c2))
+    beta2 = np.arctan(np.imag(w2)/np.real(w2))
+    delta_ct = ((Pt3_req/Pt1)**((gamma-1)/gamma)-1)*cp_air*Tt1/spool_speed1/stage_eff
+    work_stage = spool_speed1*delta_ct # specific work per stage
 
-    Pt3 = Pt1 * press_ratio**(1/num_stages)
-    # Pt3 = Pt2 - .5*loss_coeffs*densitys2*np.abs(c2)**2
-    Tt3 = ((Pt3/Pt1)**((gamma-1)/gamma)-1)*Tt1 + Tt1
-    densityt3 = Pt3/R_air/Tt3
-    mach3 = rootfind.newton2(find_area, .5, massflow=massflow, densityt=densityt3, Tt=Tt3, area=flow_area3)
-    Ts3 = isenf.T(mach3, Tt3)
-    Ps3 = isenf.p(mach3, Pt3)
-    sound_speed3 = np.sqrt(gamma*R_air*Ts3)
-    air_vel3 = mach3*sound_speed3
+    Ts2 = Ttr2 - np.abs(w2)**2/2/cp_air
+    Ps2 = Ptr2*(Ts2/Ttr2)**(gamma/(gamma-1))
+    densitys2 = Ps2/Ts2/R_air
+    Tt2 = Ts2 + np.abs(c2)**2/2/cp_air
+    Pt2 = Ps2*(Ts2/Tt2)**-(gamma/(gamma-1))
+    Pt3 = Pt2 - loss_coeffs*densitys2*np.abs(c2)**2/2
 
-    delta_ct = ((Pt3/Pt1)**((gamma-1)/gamma)-1)*cp_air*Tt1/spool_speed1 # change in c theta across the rotor
-    work_stage = spool_speed1*delta_ct
+    Tt3 = Tt2
+    reaction = (np.abs(w1)**2-np.abs(w2)**2)/2/spool_speed2/delta_ct
+    
+    # Tt3 = ((Pt3/Pt1)**((gamma-1)/gamma)-1)*Tt1/stage_eff + Tt1
+    # densityt3 = Pt3/R_air/Tt3
+    # mach3 = rootfind.newton2(find_area, .5, massflow=massflow, densityt=densityt3, Tt=Tt3, area=flow_area3)
+    # Ts3 = isenf.T(mach3, Tt3)
+    # Ps3 = isenf.p(mach3, Pt3)
+    # densitys3 = isenf.density(mach3, densityt3)
+    # sound_speed3 = np.sqrt(gamma*R_air*Ts3)
+    # air_vel3 = mach3*sound_speed3
 
-    Ts2 = reaction*(Tt3-Tt1) + Ts1
+    # Ts2 = reaction*(Tt3-Tt1) + Ts1
+    # machz = np.real(c1)/sound_speed1
+    # macht = spool_speed1/sound_speed1
+    # bottom = 1/macht**2 + (gamma-1)/(2*np.cos(alpha1)*np.cos(alpha1))*(machz/macht)**2
+    # first = (gamma-1)/bottom
+    # second = 1 + (machz/macht)*(np.tan(beta2)-np.tan(alpha1))
+    # Tt2 = (1 + first*second)*Tt1
+        
+    print()
+    print('beta1 deg', beta1*180/np.pi)
+    print('C1 ft/s', c1/.0254/12)
+    print('W1 ft/s', w1/.0254/12)
+    print('Ptr1 psia', convert_pressures(Ptr1, 'imp'))
+    print('Ttr1 R', convert_temps(Ttr1, 'imp'))
+    print('Wheel speed ft/s', spool_speed1/.0254/12)
+    print('||w1|| ft/s', abs(w1)/.0254/12)
+    print()
+    print('beta2 deg', beta2*180/np.pi)
+    print('C2 ft/s', c2/.0254/12)
+    print('W2 ft/s', w2/.0254/12)
+    print('Ptr2 psia', convert_pressures(Ptr2, 'imp'))
+    print('Ttr2 R', convert_temps(Ttr2, 'imp'))
+    print('||w2|| ft/s', abs(w2)/.0254/12)
+    print('||c2|| ft/s', abs(c2)/.0254/12)
+    print('alpha2 deg', alpha2*180/np.pi)
+    print('Pt2 psia', convert_pressures(Pt2, 'imp'))
+    print('Tt2 R', convert_temps(Tt2, 'imp'))
+    print('Ps2 psia', convert_pressures(Ps2, 'imp'))
+    print('Ts2 R', convert_temps(Ts2, 'imp'))
+    print('Stage work btu/lbm', convert_work(work_stage, 'imp'))
+    print()
+    print('Pt3 psia', convert_pressures(Pt3, 'imp'))
+    print('Tt3 R', convert_temps(Tt3, 'imp'))
+    print('reaction', reaction)
 
     fig, (axs1, axs2) = plt.subplots(1, 2)
     axs1.axhline(y=0)
@@ -391,12 +457,12 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     axs1.plot([np.real(c1), np.real(c1)], [np.imag(c1), np.imag(c1)-spool_speed1], label='Spool1', color='green')
     axs1.legend()
 
-    axs2.axhline(0)
-    axs2.plot([0,np.real(c2)], [0, np.imag(c2)], label='c2', color='blue')
-    axs2.plot([0,np.real(w2)], [0, np.imag(w2)], label='w2', color='red')
-    axs2.plot([np.real(w2), np.real(w2)], [np.imag(w2), np.imag(w2)+spool_speed1], label='Spool2', color='green')
-    axs2.legend()
-    plt.show()
+    # axs2.axhline(0)
+    # axs2.plot([0,np.real(c2)], [0, np.imag(c2)], label='c2', color='blue')
+    # axs2.plot([0,np.real(w2)], [0, np.imag(w2)], label='w2', color='red')
+    # axs2.plot([np.real(w2), np.real(w2)], [np.imag(w2), np.imag(w2)+spool_speed2], label='Spool2', color='green')
+    # axs2.legend()
+    # plt.show()
 
 def airfoil_count():
     rotor_solidity = 1.3 # chord/spacing
@@ -404,12 +470,12 @@ def airfoil_count():
     rotor_airfoil_width = 3.56 *.0254
 
     stator_solidity = 1.2 # chord/spacing
-    stator_pitch_diam = 22*.0254
+    stator_pitch_diam = 22*.0254  
     stator_airfoil_width = 3.3 *.0254
 
     meanline_slope = 5.9 # deg
 
-    beta1 = 59.4*np.pi/180
+    beta1 = -59.4*np.pi/180
     beta2 = 43.3*np.pi/180
     alpha2 = 25.2*np.pi/180
     alpha3 = 0*np.pi/180
@@ -432,6 +498,7 @@ def airfoil_count():
     print('trailing edge thickness in \t{}'.format(.009*stator_chord/.0254))
     print('camber angle \t{}'.format(stator_camber_angle*180/np.pi))
     print('thickness in \t{}'.format(.05*stator_chord/.0254))
+    print(rotor_stagger_angle*180/np.pi, stator_stagger_angle*180/np.pi)
     num_airfoils = np.array([rotor_num_airfoils, stator_num_airfoils], dtype=int)
     print(num_airfoils)
     return num_airfoils
@@ -478,5 +545,5 @@ if __name__ == '__main__':
     # engine_config_plots(dFrame, [7, 9, 9], Ts3max, 0, 0)
     # print(assignment5(dFrame))
     # ans6 = assignment6()
-    # assignment7()
-    airfoil_count()
+    assignment7()
+    # airfoil_count()
