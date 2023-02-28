@@ -350,7 +350,7 @@ def assignment6():
 
     return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
 
-def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages, Dt1, Dp1, Dp2, flow_area3, spool_speed, stage_eff, loss_coeffr, loss_coeffs, reaction, gamma=1.4, R_air=287.05):
+def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages, Dt1, Dp1, Dp2, flow_area3, spool_speed, stage_eff, loss_coeffr, loss_coeffs, reaction, alpha3, gamma=1.4, R_air=287.05):
     '''Calculations are acrosss one stage of a compressor. The subscripts denote stations across the stage.
     Station 1 is before the rotor, station 2 is between the rotor and the stator, station 3 is after the stator.
     c = cz + ctj = axial flow + azimuthal flow.
@@ -385,12 +385,10 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
 
     Ttr2 = Ttr1 - spool_speed1**2/2/cp_air + spool_speed2**2/2/cp_air
     Ptr2 = Ptr1 - loss_coeffr*densitys1*np.abs(w1)**2/2
-
-    beta2 = np.arctan(-2*(reaction-0.5)*spool_speed1/np.real(c1)-np.tan(alpha1))
-    
+   
     Pt3_req = Pt1 * press_ratio**(1/num_stages)
     stage_eff = rootfind.newton2(find_efficiency, stage_eff, c1=c1, Tt1=Tt1, Pt1=Pt1, Pt3_req=Pt3_req, spool_speed1=spool_speed1, spool_speed2=spool_speed2, Ptr2=Ptr2, Ttr2=Ttr2, massflow=massflow, flow_area2=flow_area2, loss_coeffs=loss_coeffs)
-    nan, c2, w2 = find_efficiency(stage_eff, c1, Tt1, Pt1, Pt3_req, spool_speed1, spool_speed2, Ptr2, Ttr2, massflow, flow_area2, loss_coeffs)
+    unused, c2, w2 = find_efficiency(stage_eff, c1, Tt1, Pt1, Pt3_req, spool_speed1, spool_speed2, Ptr2, Ttr2, massflow, flow_area2, loss_coeffs)
     alpha2 = np.arctan(np.imag(c2)/np.real(c2))
     beta2 = np.arctan(np.imag(w2)/np.real(w2))
     delta_ct = ((Pt3_req/Pt1)**((gamma-1)/gamma)-1)*cp_air*Tt1/spool_speed1/stage_eff
@@ -405,24 +403,15 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
 
     Tt3 = Tt2
     reaction = (np.abs(w1)**2-np.abs(w2)**2)/2/spool_speed2/delta_ct
-    
-    # Tt3 = ((Pt3/Pt1)**((gamma-1)/gamma)-1)*Tt1/stage_eff + Tt1
-    # densityt3 = Pt3/R_air/Tt3
-    # mach3 = rootfind.newton2(find_area, .5, massflow=massflow, densityt=densityt3, Tt=Tt3, area=flow_area3)
-    # Ts3 = isenf.T(mach3, Tt3)
-    # Ps3 = isenf.p(mach3, Pt3)
-    # densitys3 = isenf.density(mach3, densityt3)
-    # sound_speed3 = np.sqrt(gamma*R_air*Ts3)
-    # air_vel3 = mach3*sound_speed3
-
-    # Ts2 = reaction*(Tt3-Tt1) + Ts1
-    # machz = np.real(c1)/sound_speed1
-    # macht = spool_speed1/sound_speed1
-    # bottom = 1/macht**2 + (gamma-1)/(2*np.cos(alpha1)*np.cos(alpha1))*(machz/macht)**2
-    # first = (gamma-1)/bottom
-    # second = 1 + (machz/macht)*(np.tan(beta2)-np.tan(alpha1))
-    # Tt2 = (1 + first*second)*Tt1
-        
+    densityt3 = Pt3/R_air/Tt3
+    mach3 = rootfind.newton2(find_area, .5, massflow=massflow, densityt=densityt3, Tt=Tt3, area=flow_area3)
+    Ts3 = isenf.T(mach3, Tt3)
+    Ps3 = isenf.p(mach3, Pt3)
+    densitys3 = isenf.density(mach3, densityt3)
+    sound_speed3 = np.sqrt(gamma*R_air*Ts3)
+    air_vel3 = mach3*sound_speed3
+    c3 = np.cos(alpha3)*air_vel3 + np.sin(alpha3)*air_vel3 
+          
     print()
     print('beta1 deg', beta1*180/np.pi)
     print('C1 ft/s', c1/.0254/12)
@@ -449,20 +438,9 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     print('Pt3 psia', convert_pressures(Pt3, 'imp'))
     print('Tt3 R', convert_temps(Tt3, 'imp'))
     print('reaction', reaction)
-
-    fig, (axs1, axs2) = plt.subplots(1, 2)
-    axs1.axhline(y=0)
-    axs1.plot([0,np.real(c1)], [0, np.imag(c1)], label='c1', color='blue')
-    axs1.plot([0,np.real(w1)], [0, np.imag(w1)], label='w1', color='red')
-    axs1.plot([np.real(c1), np.real(c1)], [np.imag(c1), np.imag(c1)-spool_speed1], label='Spool1', color='green')
-    axs1.legend()
-
-    # axs2.axhline(0)
-    # axs2.plot([0,np.real(c2)], [0, np.imag(c2)], label='c2', color='blue')
-    # axs2.plot([0,np.real(w2)], [0, np.imag(w2)], label='w2', color='red')
-    # axs2.plot([np.real(w2), np.real(w2)], [np.imag(w2), np.imag(w2)+spool_speed2], label='Spool2', color='green')
-    # axs2.legend()
-    # plt.show()
+    print('stage efficiency', stage_eff)
+    print('c3', c3/.0254/12)
+    print('Ps3 psia', convert_pressures(Ps3, 'imp'))
 
 def airfoil_count():
     rotor_solidity = 1.3 # chord/spacing
@@ -498,7 +476,6 @@ def airfoil_count():
     print('trailing edge thickness in \t{}'.format(.009*stator_chord/.0254))
     print('camber angle \t{}'.format(stator_camber_angle*180/np.pi))
     print('thickness in \t{}'.format(.05*stator_chord/.0254))
-    print(rotor_stagger_angle*180/np.pi, stator_stagger_angle*180/np.pi)
     num_airfoils = np.array([rotor_num_airfoils, stator_num_airfoils], dtype=int)
     print(num_airfoils)
     return num_airfoils
@@ -536,7 +513,7 @@ def assignment7():
 
     spool_speed_rads = spool_speed_rpm*2*np.pi/60
         
-    compressor_vel_diagrams(Tt1, Pt1, massflow1, alpha1, comp_press_ratio, num_stages, Dt1, Dp1, Dp2, area3, spool_speed_rads, stage_eff, loss_coeff_r, loss_coeff_s, reaction)
+    compressor_vel_diagrams(Tt1, Pt1, massflow1, alpha1, comp_press_ratio, num_stages, Dt1, Dp1, Dp2, area3, spool_speed_rads, stage_eff, loss_coeff_r, loss_coeff_s, reaction, alpha3)
 
 
 if __name__ == '__main__':
@@ -545,5 +522,5 @@ if __name__ == '__main__':
     # engine_config_plots(dFrame, [7, 9, 9], Ts3max, 0, 0)
     # print(assignment5(dFrame))
     # ans6 = assignment6()
-    assignment7()
-    # airfoil_count()
+    # assignment7()
+    airfoil_count()
