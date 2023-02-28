@@ -478,6 +478,7 @@ def airfoil_count():
     print('thickness in \t{}'.format(.05*stator_chord/.0254))
     num_airfoils = np.array([rotor_num_airfoils, stator_num_airfoils], dtype=int)
     print(num_airfoils)
+    
     return num_airfoils
 
 def assignment7():
