@@ -95,14 +95,15 @@ def compressor(total_temperature:float, total_pressure:float, efficiency:float, 
 
     return total_temperature2_ideal, total_temperature2_actual, total_pressure2, ideal_work, actual_work
 
-def combustor(Tt31, Tt4, m31, LHV, comb_eff, gamma_hot, gamma_cold=1.4, R_air=287.05):
+def combustor(Tt31, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot, gamma_cold=1.4, R_air=287.05):
     cp_cold = gamma_cold*R_air/(gamma_cold-1)
     cp_hot = gamma_hot*R_air/(gamma_hot-1)
     
     mfuel = (m31*cp_cold*Tt31 - m31*cp_hot*Tt4)/(cp_hot*Tt4 - LHV) # Does not take into account combustor efficieny, i.e efficiency = 1
     fuel_air_ratio = (cp_hot*Tt4 - cp_cold*Tt31)/(LHV*comb_eff - cp_hot*Tt4) # Does take into account efficiency
     
-    return fuel_air_ratio
+    Pt4 = Pt3*comb_press_drop
+    return (fuel_air_ratio, Pt4)
 
 def nozzle(Tt, Pt, pressure_ratio):
     # efficiency = 
@@ -223,19 +224,19 @@ def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, tot
     
     return ((inlet_hub_radius*2, outlet_hub_diam, avg_gap, avg_blade_height), spool_speed_rpm, num_stages, compressor_length)
 
-def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, gamma_hot):
+def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, comb_press_drop, gamma_hot):
     Tt0, Pt0 = ambient_properties(mach0, Tambient, Pambient)
     Tt1, Pt1, Ts1, Ps1, Vel1 = inlet(mach1, Tt0, Pt0, inlet_press_rec)
     Tt13i, Tt13a, Pt13, Wfi, Wfa = compressor(Tt1, Pt1, fan_eff, fan_press_ratio, bypass_ratio) # for the fan
     Tt3i, Tt3a, Pt3, Wci, Wca = compressor(Tt13a, Pt13, comp_eff, comp_press_ratio, 0)
     Tt31 = Tt13a
-    fuel_air_ratio = combustor(Tt31, Tt4, m31, LHV, comb_eff, gamma_hot)
+    fuel_air_ratio, Pt4 = combustor(Tt31, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot)
 
-    temperautres_emps = convert_temps([Tambient, Tt0, Tt1, Ts1, Tt13i, Tt13a, Tt3i, Tt3a], 'imp')
-    Ts0_emp, Tt0_emp, Tt1_emp, Ts1_emp, Tt13i_emp, Tt13a_emp, Tt3i_emp, Tt3a_emp = temperautres_emps
+    temperautres_emps = convert_temps([Tambient, Tt0, Tt1, Ts1, Tt13i, Tt13a, Tt3i, Tt3a, Tt4], 'imp')
+    Ts0_emp, Tt0_emp, Tt1_emp, Ts1_emp, Tt13i_emp, Tt13a_emp, Tt3i_emp, Tt3a_emp, Tt4_emp = temperautres_emps
 
-    pressures_emps = convert_pressures([Pambient, Pt0, Pt1, Ps1, Pt13, Pt3], 'imp')
-    Ps0_emp, Pt0_emp, Pt1_emp, Ps1_emp, Pt13_emp, Pt3_emp = pressures_emps
+    pressures_emps = convert_pressures([Pambient, Pt0, Pt1, Ps1, Pt13, Pt3, Pt4], 'imp')
+    Ps0_emp, Pt0_emp, Pt1_emp, Ps1_emp, Pt13_emp, Pt3_emp, Pt4_emp = pressures_emps
 
     Vel1_emp = Vel1 / 12 / .0254
 
@@ -253,40 +254,17 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
 
     labels3 = np.array(['Total Temperature Ideal (R)', 'Total Temperature Actual (R)', 'Total Pressure (psia)', 'Work Ideal (BTU/lbm)', 'Work Actual (BTU/lbm)'])
     station3 = pd.Series([Tt3i_emp, Tt3a_emp, Pt3_emp, Wci_emp, Wca_emp], index=[np.repeat('3 Compressor Exit', len(labels3)), labels3])
+
+    labels4 = np.array(['Total Temperature (R)', 'Total Pressure (psia)', 'Fuel/Air'])
+    station4 = pd.Series([Tt4_emp, Pt4_emp, fuel_air_ratio], index=[np.repeat('4 Combustor Exit', len(labels4)), labels4])
     
-    return (station0, station1, station13, station3)
+    return (station0, station1, station13, station3, station4)
 
-def engine_configurations():
-    Rair = 287.05 # J/kg-K
-    mach0 = .8
-    Tambient = -44.4 # C
-    Pambient = 4.36 # psia
-
-    Tambient = Tambient + 273 # K
-    Pambient = Pambient * 6894.76 # Pa
-
-    bypass_ratio = 2
-    inlet_press_rec = .99
-    mach1 = .4
-
-    fan_eff = .88
-    fan_press_ratio = 1.6
-    
-    comp_eff = .87
-    comp_press_ratio = [7, 9, 9]
-
-    m31 = .9
-    LHV = 18550 # BTU/lbmfuel
-    LHV = convert_work(LHV, 'SI')
-    turbine_inlet_temp = [2100, 2100, 2200] # F
-    Tt4 = convert_temps(turbine_inlet_temp, 'SI')
-    comb_eff = .995
-    gamma_hot = 1.3
-
+def engine_configurations(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, comb_press_drop, gamma_hot):
     dfConfigs = pd.DataFrame()
     for i in range(3):
-        station0, station1, station13, station3 = engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, gamma_hot)
-        dfConfigi = pd.DataFrame(pd.concat([station0, station1, station13, station3]), columns=['Config {}'.format(i+1)])
+        stations  = engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, comb_press_drop, gamma_hot)
+        dfConfigi = pd.DataFrame(pd.concat(stations), columns=['Config {}'.format(i+1)])
         dfConfigs = pd.concat([dfConfigs, dfConfigi], axis=1)
     dfConfigs.index = dfConfigs.index.rename(['Station','Property'])
     dfConfigs.to_csv('Engine Configurations.csv')
@@ -516,6 +494,52 @@ def assignment7():
         
     compressor_vel_diagrams(Tt1, Pt1, massflow1, alpha1, comp_press_ratio, num_stages, Dt1, Dp1, Dp2, area3, spool_speed_rads, stage_eff, loss_coeff_r, loss_coeff_s, reaction, alpha3)
 
+def rfp1a():
+    # General values
+    alt = 30000 # ft
+    thrust = 7000 # lbf
+    spec_trust = 98.4 # lbf/lbmass flow through compressor
+    # Ambient values
+    mach0 = .8
+    Ts0 = -44.4 # C
+    Ps0 = 4.36 # psia
+    # Inlet values
+    inlet_press_rec = .99
+    # Fan values
+    mach1 = .4
+    bypass = 2
+    fan_press_ratio = 1.6 # pt13/pt1
+    inlet_diam = 51.6 # in
+    fan_eff = .88
+    # Compressor values
+    comp_press_ratio = [7, 9, 9] # pt3/pt2
+    massflow2 = 71.2 # lbm
+    comp_eff = .87
+    comp_leak_flow = .01
+    turbine_cool_flow = .06
+    customer_bleed_flow = .03
+    massflow31 = 1 - comp_leak_flow - turbine_cool_flow - customer_bleed_flow
+    # Combustor values
+    comb_press_drop = .95 # Pt4/Pt3
+    comb_eff = .995 # actual heat/ ideal heat
+    LHV = 18550 # BTU/lbmfuel
+    turbine_inlet_temp = [2100, 2100, 2200] # F
+    comb_eff = .995
+    gamma_hot = 1.3
+    # Turbine values
+    Tt4 = 2100 # F
+    core_turb_eff = .92
+    fan_turb_eff = .925
+    core_exh_coeff = .983 # V9actual/V9ideal
+    fan_exh_coeff = .985  
+    # Conversions
+    Ts0 = Ts0 + 273
+    Ps0 = convert_pressures(Ps0, 'SI')
+    Tt4 = convert_temps(turbine_inlet_temp, 'SI')
+    LHV = convert_work(LHV, 'SI')
+
+    dfConfigs = engine_configurations(Ts0, Ps0, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass, comp_eff, comp_press_ratio, massflow31, LHV, Tt4, comb_eff, comb_press_drop, gamma_hot)
+    print(dfConfigs)
 
 if __name__ == '__main__':
     Ts3max = 450 # F
@@ -524,4 +548,5 @@ if __name__ == '__main__':
     # print(assignment5(dFrame))
     # ans6 = assignment6()
     # assignment7()
-    airfoil_count()
+    # airfoil_count()
+    rfp1a()
