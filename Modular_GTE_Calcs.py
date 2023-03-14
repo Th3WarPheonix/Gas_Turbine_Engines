@@ -287,13 +287,34 @@ def engine_configurations(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan
     dfConfigs.to_csv('Engine Configurations.csv')
     return dfConfigs
     
-def engine_config_plots(dfConfigs, comp_press_ratio, Ts3max, T495max, Tt9max):
-    fig, axs = plt.subplots(2,2)
+def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max):
+    fig, axs = plt.subplots(2,2, figsize=(10, 6))
+    plt.subplots_adjust(wspace=.4, hspace=.4)
+
     axs[0,0].plot(comp_press_ratio, dfConfigs.loc['3 Compressor Exit', 'Total Temperature Actual (R)'] - 460)
     axs[0,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
-    axs[0,0].set_ylabel('Compressor Exit\nTemperature $T_{s_3}$ ($^\circ$F)')
-    axs[0,0].axhline(Ts3max, linestyle=':')
-    axs[0,0].set_title('Compressor Pressure Ratio vs\nCompressor Exit Temperature')
+    axs[0,0].set_ylabel('Compressor Exit\nTemperature $T_{t_3}$ ($^\circ$F)')
+    axs[0,0].axhline(Tt3max, linestyle=':')
+    axs[0,0].set_title('Compressor Exit Temperature vs\nCompressor Pressure Ratio')
+
+    axs[0,1].plot(comp_press_ratio, dfConfigs.loc['4.9 HPT Exit', 'Total Temperature (R)'] - 460)
+    axs[0,1].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
+    axs[0,1].set_ylabel('Exhaust Gas\nTemperature $T_{t_{4.95}}$ ($^\circ$F)')
+    axs[0,1].axhline(Tt495max, linestyle=':')
+    axs[0,1].set_title('Exhaust Gas Temperature vs\nCompressor Pressure Ratio')
+
+    # axs[2,0].plot(comp_press_ratio, dfConfigs.loc['4.9 HPT Exit', 'Total Temperature (R)'] - 460)
+    # axs[2,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
+    # axs[2,0].set_ylabel('Exhaust Gas\nTemperature $T_{t_{4.95}}$ ($^\circ$F)')
+    # axs[2,0].axhline(Tt495max, linestyle=':')
+    # axs[2,0].set_title('Mission fuel burn vs\nCompressor Pressure Ratio')
+
+    # axs[2,1].plot(comp_press_ratio, dfConfigs.loc['4.9 HPT Exit', 'Total Temperature (R)'] - 460)
+    # axs[2,1].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
+    # axs[2,1].set_ylabel('Exhaust Gas\nTemperature $T_{t_{4.95}}$ ($^\circ$F)')
+    # axs[2,1].axhline(Tt495max, linestyle=':')
+    # axs[2,1].set_title('Engine Diameter vs\nCompressor Pressure Ratio')
+
     plt.show()
 
 def assignment5(dfConfigs, R_air=287.05):
@@ -549,7 +570,12 @@ def rfp1a():
     fan_turb_eff = .925
     # Nozzle values
     core_exh_coeff = .983 # V9actual/V9ideal
-    fan_exh_coeff = .985  
+    fan_exh_coeff = .985
+    # Operating limits
+    max_diam = 30 # in
+    max_Tt3 = 450 # F
+    max_Tt495 = 890 # C
+    max_Tt9 = 880 # C
     # Conversions
     Ts0 = Ts0 + 273
     Ps0 = convert_pressures(Ps0, 'SI')
@@ -558,6 +584,7 @@ def rfp1a():
 
     dfConfigs = engine_configurations(Ts0, Ps0, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass, comp_eff, comp_press_ratio, massflow31, LHV, Tt4, comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, gamma_hot)
     print(dfConfigs)
+    engine_config_plots(dfConfigs, comp_press_ratio, max_Tt3, max_Tt495)
 
 if __name__ == '__main__':
     Ts3max = 450 # F
