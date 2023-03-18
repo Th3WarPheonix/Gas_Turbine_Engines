@@ -69,23 +69,26 @@ def convert_work(works, to:str):
         except:
             return np.array(works) * 1055 * 2.205
 
-def ambient_properties(mach:float, temperature:float, pressure:float, gamma:float=1.4):
-    total_temperature = isenf.T0(mach, temperature, gamma)
-    total_pressure    = isenf.p0(mach, pressure, gamma)
+def ambient_properties(mach:float, static_temperature0:float, static_pressure0:float, gamma:float=1.4):
+    total_temperature0 = isenf.T0(mach, static_temperature0, gamma)
+    total_pressure0    = isenf.p0(mach, static_pressure0, gamma)
 
-    return total_temperature, total_pressure
+    return total_temperature0, total_pressure0
 
-def inlet(mach:float, total_temperature:float, total_pressure:float, Ipr:float, gamma:float=1.4, R_air:float=287.05):
-    total_pressure2     = Ipr*total_pressure
-    total_temperature2  = total_temperature
-    static_temperature2 = isenf.T(mach, total_temperature2, gamma)
-    static_pressure2    = isenf.p(mach, total_pressure2, gamma)
-    velocity = mach*np.sqrt(gamma*R_air*static_temperature2)
+def inlet(mach1:float, total_temperature0:float, total_pressure0:float, Ipr:float, gamma:float=1.4, R_air:float=287.05):
+    """Station 1 - Fan Face"""
+    total_pressure1     = Ipr*total_pressure0
+    total_temperature1  = total_temperature0
+    static_temperature1 = isenf.T(mach1, total_temperature1, gamma)
+    static_pressure1    = isenf.p(mach1, total_pressure1, gamma)
+    velocity = mach1*np.sqrt(gamma*R_air*static_temperature1)
 
-    return total_temperature2, total_pressure2, static_temperature2, static_pressure2, velocity
+    return total_temperature1, total_pressure1, static_temperature1, static_pressure1, velocity
 
 def compressor(total_temperature:float, total_pressure:float, efficiency:float, pressure_ratio:float, bypass_ratio:float, gamma:float=1.4, R_air:float=287.05):
-    """This set of equations works for any compressor, including a fan. The work results are normalized to the mass flow passing through the compressor."""
+    """Station 2, 13 - Fan Exit\n
+    Station 3 - Compressor Exit\n
+    This set of equations works for any compressor (bypass_ratio=0), including a fan. The work results are normalized to the mass flow passing through the compressor."""
     cp_air = gamma*R_air/(gamma-1)
     total_pressure2 = pressure_ratio*total_pressure
     total_temperature2_ideal = (total_pressure2/total_pressure)**((gamma-1)/gamma) * total_temperature
@@ -96,6 +99,7 @@ def compressor(total_temperature:float, total_pressure:float, efficiency:float, 
     return total_temperature2_ideal, total_temperature2_actual, total_pressure2, ideal_work, actual_work
 
 def combustor(Tt31, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot, gamma_cold=1.4, R_air=287.05):
+    """Station 4 - Combustor Exit"""
     cp_cold = gamma_cold*R_air/(gamma_cold-1)
     cp_hot = gamma_hot*R_air/(gamma_hot-1)
     
@@ -106,6 +110,9 @@ def combustor(Tt31, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot, ga
     return (fuel_air_ratio, Pt4)
 
 def turbine(Tt4, Pt4, massflow31, comp_work, fan_work, coolflow, turb_comp_eff, turb_fan_eff, gamma_hot, gamma_cold=1.4, R_air=287.05):
+    """Station 4.9 - High Pressure Turbine (HPT) Exit\n
+    Station 4.95 - Low Pressure Turbine (LPT) Entrance\n
+    Station 5 - Low Pressure Turbine Exit"""
     cp_cold = gamma_cold*R_air/(gamma_cold-1)
     cp_hot = gamma_hot*R_air/(gamma_hot-1)
 
@@ -115,9 +122,11 @@ def turbine(Tt4, Pt4, massflow31, comp_work, fan_work, coolflow, turb_comp_eff, 
     Pt5 = Pt49*(Tt5/Tt49)**(gamma_hot/(gamma_hot-1))
     return (Tt49, Tt5, Pt49, Pt5)
 
-def nozzle(Tt, Pt, pressure_ratio):
-    # efficiency = 
-    pass
+def nozzle(Tt5, Pt5, Ps9, pressure_ratio, gamma_hot=1.3):
+    """Station 9-Nozzle Exit"""
+    Ts9i = (Tt5/(Pt5/Ps9))**((gamma_hot-1)/gamma_hot)
+    
+    return Ts9i
 
 def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0AHL:float, mach_throat:float, Tt0:float, Pt0:float, Ts1:float, Ps1:float, mach_fan:float, diffuser_angle:float, gamma:float=1.4, R_air:float=287.05):
 
@@ -274,8 +283,11 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
 
     labels5 = np.array(['Total Temperature (R)', 'Total Pressure (psia)'])
     station5 = pd.Series([Tt5_emp, Pt5_emp], index=[np.repeat('5 LPT Exit', len(labels5)), labels5])
+
+    labels9 = np.array(['Static Temperature (psia)'])
+    station9 = pd.Series([convert_pressures(Pambient, 'imp')], index=[np.repeat('9 LPT Exit', len(labels9)), labels9])
     
-    return (station0, station1, station13, station3, station4, station49, station5)
+    return (station0, station1, station13, station3, station4, station49, station5, station9)
 
 def engine_configurations(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, gamma_hot):
     dfConfigs = pd.DataFrame()
