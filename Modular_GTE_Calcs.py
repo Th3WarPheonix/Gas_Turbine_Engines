@@ -306,7 +306,7 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
 
 def engine_configurations(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, gamma_hot):
     dfConfigs = pd.DataFrame()
-    for i in range(3):
+    for i in range(len(comp_press_ratio)):
         stations  = engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, gamma_hot)
         dfConfigi = pd.DataFrame(pd.concat(stations), columns=['Config {}'.format(i+1)])
         dfConfigs = pd.concat([dfConfigs, dfConfigi], axis=1)
@@ -577,7 +577,7 @@ def rfp2():
     inlet_diam = 51.6 # in
     fan_eff = .88
     # Compressor values
-    comp_press_ratio = [7, 9, 9] # pt3/pt2
+    comp_press_ratio = [7]#[7, 9, 9] # pt3/pt2
     massflow2 = 71.2 # lbm
     comp_eff = .87
     comp_leak_flow = .01
@@ -588,7 +588,7 @@ def rfp2():
     comb_press_drop = .95 # Pt4/Pt3
     comb_eff = .995 # actual heat/ ideal heat
     LHV = 18550 # BTU/lbmfuel
-    turbine_inlet_temp = [2100, 2100, 2200] # F
+    turbine_inlet_temp = [2100] #[2100, 2100, 2200] # F
     comb_eff = .995
     gamma_hot = 1.3
     # Turbine values
