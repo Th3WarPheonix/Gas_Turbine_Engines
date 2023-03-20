@@ -278,7 +278,8 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     totalmassflow = massflow2*bypass_ratio
     inlet_area = totalmassflow/rhos0/Vel1
     inlet_diameter = np.sqrt(inlet_area*4/np.pi)
-    inlet_diameter_emp = inlet_diameter/.0254/12
+    print(inlet_diameter)
+    inlet_diameter_emp = inlet_diameter/.0254
 
     temperautres_emps = convert_temps([Tambient, Tt0, Tt1, Ts1, Tt13i, Tt13a, Tt3i, Tt3a, Tt4, Tt49, Tt5, Ts9i, Ts9a], 'imp')
     Ts0_emp, Tt0_emp, Tt1_emp, Ts1_emp, Tt13i_emp, Tt13a_emp, Tt3i_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt5_emp, Ts9i_emp, Ts9a_emp = temperautres_emps
@@ -329,8 +330,8 @@ def engine_configurations(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan
     return dfConfigs
     
 def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol, max_diam):
-    fig, axs = plt.subplots(2,2, figsize=(10, 6))
-    plt.subplots_adjust(wspace=.4, hspace=.6)
+    fig, axs = plt.subplots(2,2, figsize=(10, 7))
+    plt.subplots_adjust(wspace=.4, hspace=.7)
 
     axs[0,0].scatter(comp_press_ratio, dfConfigs.loc['3 Compressor Exit', 'Total Temperature Actual (R)'] - 460, marker='.')
     axs[0,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
@@ -361,6 +362,62 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     axs[1,1].legend()
 
     plt.show()
+
+def rfp2():
+    # General values
+    alt = 30000 # ft
+    thrust = 4800 # lbf
+    spec_trust = 98.4 # lbf/lbmass flow through compressor
+    fuel_vol = 1600 # gallons
+    max_inlet_diam = 30 # in
+    # Ambient values
+    mach0 = .8
+    Ts0 = -44.4 # C
+    Ps0 = 4.36 # psia
+    # Inlet values
+    inlet_press_rec = .99
+    # Fan values
+    mach1 = .4
+    bypass = 2
+    fan_press_ratio = 1.6 # pt13/pt1
+    inlet_diam = 51.6 # in
+    fan_eff = .88
+    # Compressor values
+    comp_press_ratio = [7, 9, 9] # pt3/pt2
+    massflow2 = 71.2 # lbm
+    comp_eff = .87
+    comp_leak_flow = .01
+    turbine_cool_flow = .06
+    customer_bleed_flow = .03
+    massflow31 = 1 - comp_leak_flow - turbine_cool_flow - customer_bleed_flow
+    # Combustor values
+    comb_press_drop = .95 # Pt4/Pt3
+    comb_eff = .995 # actual heat/ ideal heat
+    LHV = 18550 # BTU/lbmfuel
+    turbine_inlet_temp = [2100, 2100, 2200] # F
+    comb_eff = .995
+    gamma_hot = 1.3
+    # Turbine values
+    Tt4 = 2100 # F
+    core_turb_eff = .92
+    fan_turb_eff = .925
+    # Nozzle values
+    core_exh_coeff = .983 # V9actual/V9ideal
+    fan_exh_coeff = .985
+    # Operating limits
+    max_diam = 30 # in
+    max_Tt3 = 450 # F
+    max_Tt495 = 890 # C
+    max_Tt9 = 880 # C
+    # Conversions
+    Ts0 = Ts0 + 273
+    Ps0 = convert_pressures(Ps0, 'SI')
+    Tt4 = convert_temps(turbine_inlet_temp, 'SI')
+    LHV = convert_work(LHV, 'SI')
+
+    dfConfigs = engine_configurations(Ts0, Ps0, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass, comp_eff, comp_press_ratio, massflow31, LHV, Tt4, comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust, gamma_hot)
+    print(dfConfigs)
+    engine_config_plots(dfConfigs, comp_press_ratio, max_Tt3, max_Tt495, fuel_vol, max_diam)
 
 def assignment5(dfConfigs, R_gas=287.05):
     Tt0 = convert_temps(dfConfigs['Config 1'].loc['0 Freestream', 'Total Temperature (R)'], 'SI')
@@ -576,62 +633,6 @@ def assignment7():
     spool_speed_rads = spool_speed_rpm*2*np.pi/60
         
     compressor_vel_diagrams(Tt1, Pt1, massflow1, alpha1, comp_press_ratio, num_stages, Dt1, Dp1, Dp2, area3, spool_speed_rads, stage_eff, loss_coeff_r, loss_coeff_s, reaction, alpha3)
-
-def rfp2():
-    # General values
-    alt = 30000 # ft
-    thrust = 7000 # lbf
-    spec_trust = 98.4 # lbf/lbmass flow through compressor
-    fuel_vol = 1600 # gallons
-    max_inlet_diam = 30 # in
-    # Ambient values
-    mach0 = .8
-    Ts0 = -44.4 # C
-    Ps0 = 4.36 # psia
-    # Inlet values
-    inlet_press_rec = .99
-    # Fan values
-    mach1 = .4
-    bypass = 2
-    fan_press_ratio = 1.6 # pt13/pt1
-    inlet_diam = 51.6 # in
-    fan_eff = .88
-    # Compressor values
-    comp_press_ratio = [7, 9, 9] # pt3/pt2
-    massflow2 = 71.2 # lbm
-    comp_eff = .87
-    comp_leak_flow = .01
-    turbine_cool_flow = .06
-    customer_bleed_flow = .03
-    massflow31 = 1 - comp_leak_flow - turbine_cool_flow - customer_bleed_flow
-    # Combustor values
-    comb_press_drop = .95 # Pt4/Pt3
-    comb_eff = .995 # actual heat/ ideal heat
-    LHV = 18550 # BTU/lbmfuel
-    turbine_inlet_temp = [2100, 2100, 2200] # F
-    comb_eff = .995
-    gamma_hot = 1.3
-    # Turbine values
-    Tt4 = 2100 # F
-    core_turb_eff = .92
-    fan_turb_eff = .925
-    # Nozzle values
-    core_exh_coeff = .983 # V9actual/V9ideal
-    fan_exh_coeff = .985
-    # Operating limits
-    max_diam = 30 # in
-    max_Tt3 = 450 # F
-    max_Tt495 = 890 # C
-    max_Tt9 = 880 # C
-    # Conversions
-    Ts0 = Ts0 + 273
-    Ps0 = convert_pressures(Ps0, 'SI')
-    Tt4 = convert_temps(turbine_inlet_temp, 'SI')
-    LHV = convert_work(LHV, 'SI')
-
-    dfConfigs = engine_configurations(Ts0, Ps0, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass, comp_eff, comp_press_ratio, massflow31, LHV, Tt4, comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust, gamma_hot)
-    print(dfConfigs)
-    engine_config_plots(dfConfigs, comp_press_ratio, max_Tt3, max_Tt495, fuel_vol, max_diam)
 
 if __name__ == '__main__':
     Ts3max = 450 # F
