@@ -160,7 +160,7 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     fuelvol_emp = fuelflow_emp/fuel_density_emp # gal/s
     fuelvol_burned = fuelvol_emp*60*mission_length
 
-    totalmassflow = massflow2*bypass_ratio
+    totalmassflow = massflow2*(1+bypass_ratio)
     inlet_area = totalmassflow/rhos0/Vel1
     inlet_diameter = np.sqrt(inlet_area*4/np.pi)
     inlet_diameter_emp = inlet_diameter/.0254
