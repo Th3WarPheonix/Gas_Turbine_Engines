@@ -224,14 +224,24 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     labelsSummary = np.array(['Thrust (lbf)', 'Mass Flow 2 (lbm/s)', 'Specific Thrust (lbf/lbm2)', 'Fuel Burn (gal)', 'Inlet Diameter (in)'])
     stationSummary = pd.Series([thrust, massflow2_emp, thrust/massflow2_emp, fuelvol_burned, inlet_diameter_emp], index=[np.repeat('Summary', len(labelsSummary)), labelsSummary])
     
-    return (station0, station1, station3, station4, station49, station495, station5, station9, station13, station19, stationSummary)
+    # Pt0_emp, (1+bypass_ratio)*massflow2_emp
+    total_temps = (Tt0_emp, Tt1_emp, Tt13a_emp, Tt3a_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt495_emp, Tt5_emp, Tt5_emp, Tt13a_emp, Tt13a_emp)
+    total_press = (Pt0_emp, Pt1_emp, Pt13_emp, Pt3_emp, Pt3_emp, Pt4_emp, Pt49_emp, Pt49_emp, Pt5_emp, Pt5_emp, Pt13_emp, Pt13_emp)
+    total_mass = ((1+bypass_ratio)*massflow2_emp, (1+bypass_ratio)*massflow2_emp, massflow2_emp, massflow2_emp, massflow2_emp*m31, massflow2_emp*m31, massflow2_emp*m31, massflow2_emp*massflow5, massflow2_emp*massflow5, massflow2_emp*massflow5, bypass_ratio*massflow2_emp, bypass_ratio*massflow2_emp)
+    config_temps = pd.Series(total_temps, index=[np.array([0, 1, 2, 3, 3.1, 4, 4.9, 4.95, 5, 9, 13, 19], dtype=str)], name='Temperature (R)')
+    config_press = pd.Series(total_press, index=[np.array([0, 1, 2, 3, 3.1, 4, 4.9, 4.95, 5, 9, 13, 19], dtype=str)], name='Pressure (psia)')
+    config_mass = pd.Series(total_mass, index=[np.array([0, 1, 2, 3, 3.1, 4, 4.9, 4.95, 5, 9, 13, 19], dtype=str)], name='m (lbm/s)')
+    dfResult = pd.DataFrame(pd.concat([config_temps, config_press, config_mass], axis=1))
+
+    return (station0, station1, station3, station4, station49, station495, station5, station9, station13, station19, stationSummary), dfResult
 
 def engine_configurations(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust, gamma_hot):
     dfConfigs = pd.DataFrame()
     for i in range(len(comp_press_ratio)):
-        stations  = engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio[i], comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust[i], gamma_hot)
+        stations, dfResult  = engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio[i], comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust[i], gamma_hot)
         dfConfigi = pd.DataFrame(pd.concat(stations), columns=['Config {}'.format(i+1)])
         dfConfigs = pd.concat([dfConfigs, dfConfigi], axis=1)
+        dfResult.to_csv('Result_Config_{}_{}.csv'.format(comp_press_ratio[i], round(convert_temps(Tt4[i], 'imp')-460, 0)))
     dfConfigs.index = dfConfigs.index.rename(['Station','Property'])
     dfConfigs.to_csv('Engine Configurations.csv')
     return dfConfigs
@@ -243,9 +253,7 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     comp_temp = dfConfigs.loc['3 Compressor Exit', 'Total Temperature Actual (R)'] - 460
     axs[0,0].plot([comp_press_ratio[1], comp_press_ratio[4]], [comp_temp[1], comp_temp[4]], color='green')
     axs[0,0].plot([comp_press_ratio[2], comp_press_ratio[3]], [comp_temp[2], comp_temp[3]], color='green')
-    axs[0,0].fill_between([comp_press_ratio[1], comp_press_ratio[4]], [comp_temp[1], comp_temp[4]], Tt3max, label='Design Space', alpha=.5, color='gray')
-    axs[0,0].scatter(comp_press_ratio[1:4], comp_temp[1:4], marker='.', label='Configs', s=75)
-    axs[0,0].scatter(comp_press_ratio[-1], comp_temp[-1], marker='.', color='red', label='Extra')
+    axs[0,0].scatter(comp_press_ratio[1:], comp_temp[1:], marker='.', label='Configs', s=75)
     axs[0,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[0,0].set_ylabel('Compressor Exit\nTemperature $T_{t_3}$ ($^\circ$F)')
     axs[0,0].axhline(Tt3max, linestyle='--', label='RFP Limit', color='orange')
@@ -255,9 +263,7 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     Tt495s = convert_temps(dfConfigs.loc['4.95 LPT Entrance', 'Total Temperature (R)'], 'SI')-273
     axs[0,1].plot([comp_press_ratio[1], comp_press_ratio[4]], [Tt495s[1], Tt495s[4]], color='green')
     axs[0,1].plot([comp_press_ratio[2], comp_press_ratio[3]], [Tt495s[2], Tt495s[3]], color='green')
-    axs[0,1].fill_between([comp_press_ratio[1], comp_press_ratio[4]], [Tt495s[1], Tt495s[4]], Tt495max, label='Design Space', alpha=.5, color='gray')
-    axs[0,1].scatter(comp_press_ratio[1:4], Tt495s[1:4], marker='.', label='Configs', s=75)
-    axs[0,1].scatter(comp_press_ratio[-1], Tt495s[-1], marker='.', color='red', label='Extra')
+    axs[0,1].scatter(comp_press_ratio[1:], Tt495s[1:], marker='.', label='Configs', s=75)
     axs[0,1].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[0,1].set_ylabel('Exhaust Gas\nTemperature $T_{t_{4.95}}$ ($^\circ$C)')
     axs[0,1].axhline(Tt495max, linestyle='--', label='RFP Limit', color='orange')
@@ -267,9 +273,7 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     fuel_burn = dfConfigs.loc['Summary', 'Fuel Burn (gal)']
     axs[1,0].plot([comp_press_ratio[1], comp_press_ratio[4]], [fuel_burn[1], fuel_burn[4]], color='green')
     axs[1,0].plot([comp_press_ratio[2], comp_press_ratio[3]], [fuel_burn[2], fuel_burn[3]], color='green')
-    axs[1,0].fill_between([comp_press_ratio[1], comp_press_ratio[4]], [fuel_burn[1], fuel_burn[4]], Fuel_Vol, label='Design Space', alpha=.5, color='gray')
-    axs[1,0].scatter(comp_press_ratio[1:4], fuel_burn[1:4], marker='.', label='Configs', s=75)
-    axs[1,0].scatter(comp_press_ratio[-1], fuel_burn[-1], marker='.', color='red', label='Extra')
+    axs[1,0].scatter(comp_press_ratio[1:], fuel_burn[1:], marker='.', label='Configs', s=75)
     axs[1,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[1,0].set_ylabel('Fuel Burned (gal)')
     axs[1,0].axhline(Fuel_Vol, linestyle='--', label='RFP Limit', color='orange')
@@ -279,15 +283,14 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     diam = dfConfigs.loc['Summary', 'Inlet Diameter (in)']
     axs[1,1].plot([comp_press_ratio[1], comp_press_ratio[4]], [diam[1], diam[4]], color='green')
     axs[1,1].plot([comp_press_ratio[2], comp_press_ratio[3]], [diam[2], diam[3]], color='green')
-    axs[1,1].fill_between([comp_press_ratio[1], comp_press_ratio[4]], [diam[1], diam[4]], max_diam, label='Design Space', alpha=.5, color='gray')
-    axs[1,1].scatter(comp_press_ratio[1:4], diam[1:4], marker='.', label='Configs', s=75)
-    axs[1,1].scatter(comp_press_ratio[-1], diam[-1], marker='.', color='red', label='Extra')
+    axs[1,1].scatter(comp_press_ratio[1:], diam[1:], marker='.', label='Configs', s=75)
     axs[1,1].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[1,1].set_ylabel('Engine Inlet Diameter (in)')
     axs[1,1].axhline(max_diam, linestyle='--', label='RFP Limit', color='orange')
     axs[1,1].set_title('Engine Diameter vs\nCompressor Pressure Ratio')
     axs[1,1].legend()
 
+    plt.savefig('Config_plots.png')
     plt.show()
 
 def rfp2():
