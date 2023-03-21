@@ -81,9 +81,11 @@ def inlet(mach1:float, total_temperature0:float, total_pressure0:float, Ipr:floa
     total_temperature1  = total_temperature0
     static_temperature1 = isenf.T(mach1, total_temperature1, gamma)
     static_pressure1    = isenf.p(mach1, total_pressure1, gamma)
+    static_density1 = static_pressure1/R_gas/static_temperature1
+    total_density1  = total_pressure1/R_gas/total_temperature1
     velocity = mach1*np.sqrt(gamma*R_gas*static_temperature1)
 
-    return total_temperature1, total_pressure1, static_temperature1, static_pressure1, velocity
+    return total_temperature1, total_pressure1, static_temperature1, static_pressure1, velocity, static_density1, total_density1
 
 def compressor(total_temperature:float, total_pressure:float, efficiency:float, pressure_ratio:float, bypass_ratio:float, gamma:float=1.4, R_gas:float=287.05):
     """Station 2, 13 - Fan Exit\n
@@ -144,7 +146,7 @@ def nozzle(Tt5, Pt5, Ps9, Cv, gamma_hot=4/3, gamma=1.4 , R_gas=287.05):
 def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, vel_coeff_core, vel_coeff_fan, thrust, gamma_hot, gamma=1.4, R_gas=287.05):
     if bypass_ratio != 0: # Turbofan
         Tt0, Pt0, rhos0, rhot0   = ambient_properties(mach0, Tambient, Pambient)
-        Tt1, Pt1, Ts1, Ps1, Vel1 = inlet(mach1, Tt0, Pt0, inlet_press_rec)
+        Tt1, Pt1, Ts1, Ps1, Vel1, rhos1, rhot1 = inlet(mach1, Tt0, Pt0, inlet_press_rec)
         Tt13i, Tt13a, Pt13, Wfi, Wfa = compressor(Tt1, Pt1, fan_eff, fan_press_ratio, bypass_ratio) # Fan
         Tt3i, Tt3a, Pt3, Wci, Wca = compressor(Tt13a, Pt13, comp_eff, comp_press_ratio, 0)
 
@@ -154,7 +156,7 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
         Ts19i, Ts19a, Pt19, Vel19 = nozzle(Tt13a, Pt13, Pambient, vel_coeff_fan) # Fan
     else: # Turbojet
         Tt0, Pt0, rhos0, rhot0    = ambient_properties(mach0, Tambient, Pambient)
-        Tt1, Pt1, Ts1, Ps1, Vel1  = inlet(mach1, Tt0, Pt0, inlet_press_rec)
+        Tt1, Pt1, Ts1, Ps1, Vel1, rhos1, rhot1  = inlet(mach1, Tt0, Pt0, inlet_press_rec)
         Tt3i, Tt3a, Pt3, Wci, Wca = compressor(Tt1, Pt1, comp_eff, comp_press_ratio, 0)
         fuel_air_ratio, Pt4       = combustor(Tt3a, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot)
         Tt49, Tt5, Pt49, Pt5, massflow5, Tt495 = turbine(Tt4, Pt4, Tt3a, m31+fuel_air_ratio, Wca, 0, turbine_cool_flow, core_turb_eff, fan_turb_eff, gamma_hot)
@@ -169,13 +171,13 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     # Calculate the fuel burned base on massflow required
     fuel_density_emp = 6.532 # lbm/gal
     mission_length = 110 # minutes
-    fuelflow = massflow2*fuel_air_ratio # kg/s
+    fuelflow = massflow2*fuel_air_ratio/m31 # kg/s
     fuelflow_emp = convert_mass(fuelflow, 'imp') # lbm/s
     fuelvol_emp = fuelflow_emp/fuel_density_emp # gal/s
     fuelvol_burned = fuelvol_emp*60*mission_length
     # Calculate the diameter needed to suck in the required mass flow
     totalmassflow = massflow2*(1+bypass_ratio)
-    inlet_area = totalmassflow/rhos0/Vel1
+    inlet_area = totalmassflow/rhos1/Vel1
     inlet_diameter = np.sqrt(inlet_area*4/np.pi)
     inlet_diameter_emp = inlet_diameter/.0254
     # Conversions
@@ -238,29 +240,32 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     fig, axs = plt.subplots(2,2, figsize=(10, 7))
     plt.subplots_adjust(wspace=.4, hspace=.7)
 
-    axs[0,0].scatter(comp_press_ratio[1:], dfConfigs.loc['3 Compressor Exit', 'Total Temperature Actual (R)'][1:] - 460, marker='.')
+    axs[0,0].scatter(comp_press_ratio[1:4], dfConfigs.loc['3 Compressor Exit', 'Total Temperature Actual (R)'][1:4] - 460, marker='.', label='Configs', s=75)
+    axs[0,0].scatter(comp_press_ratio[-1], dfConfigs.loc['3 Compressor Exit', 'Total Temperature Actual (R)'][-1] - 460, marker='.', color='red', label='Extra')
     axs[0,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[0,0].set_ylabel('Compressor Exit\nTemperature $T_{t_3}$ ($^\circ$F)')
     axs[0,0].axhline(Tt3max, linestyle='--', label='RFP Limit', color='orange')
     axs[0,0].set_title('Compressor Exit Temperature vs\nCompressor Pressure Ratio')
     axs[0,0].legend()
 
-    print(convert_temps(dfConfigs.loc['4.95 LPT Entrance', 'Total Temperature (R)'][1:], 'SI')-273)
-    axs[0,1].scatter(comp_press_ratio[1:], convert_temps(dfConfigs.loc['4.95 LPT Entrance', 'Total Temperature (R)'][1:], 'SI')-273, marker='.')
+    axs[0,1].scatter(comp_press_ratio[1:4], convert_temps(dfConfigs.loc['4.95 LPT Entrance', 'Total Temperature (R)'][1:4], 'SI')-273, marker='.', label='Configs', s=75)
+    axs[0,1].scatter(comp_press_ratio[-1], convert_temps(dfConfigs.loc['4.95 LPT Entrance', 'Total Temperature (R)'][-1], 'SI')-273, marker='.', color='red', label='Extra')
     axs[0,1].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[0,1].set_ylabel('Exhaust Gas\nTemperature $T_{t_{4.95}}$ ($^\circ$C)')
     axs[0,1].axhline(Tt495max, linestyle='--', label='RFP Limit', color='orange')
     axs[0,1].set_title('Exhaust Gas Temperature vs\nCompressor Pressure Ratio')
     axs[0,1].legend()
 
-    axs[1,0].scatter(comp_press_ratio[1:], dfConfigs.loc['Summary', 'Fuel Burn (gal)'][1:], marker='.')
+    axs[1,0].scatter(comp_press_ratio[1:4], dfConfigs.loc['Summary', 'Fuel Burn (gal)'][1:4], marker='.', label='Configs', s=75)
+    axs[1,0].scatter(comp_press_ratio[-1], dfConfigs.loc['Summary', 'Fuel Burn (gal)'][-1], marker='.', color='red', label='Extra')
     axs[1,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[1,0].set_ylabel('Fuel Burned (gal)')
     axs[1,0].axhline(Fuel_Vol, linestyle='--', label='RFP Limit', color='orange')
     axs[1,0].set_title('Mission fuel burn vs\nCompressor Pressure Ratio')
     axs[1,0].legend()
 
-    axs[1,1].scatter(comp_press_ratio[1:], dfConfigs.loc['Summary', 'Inlet Diameter (in)'][1:], marker='.')
+    axs[1,1].scatter(comp_press_ratio[1:4], dfConfigs.loc['Summary', 'Inlet Diameter (in)'][1:4], marker='.', label='Configs', s=75)
+    axs[1,1].scatter(comp_press_ratio[-1], dfConfigs.loc['Summary', 'Inlet Diameter (in)'][-1], marker='.', color='red', label='Extra')
     axs[1,1].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[1,1].set_ylabel('Engine Inlet Diameter (in)')
     axs[1,1].axhline(max_diam, linestyle='--', label='RFP Limit', color='orange')
@@ -324,11 +329,4 @@ def rfp2():
     engine_config_plots(dfConfigs, comp_press_ratio, max_Tt3, max_Tt495, fuel_vol, max_diam)
 
 if __name__ == '__main__':
-    Ts3max = 450 # F
-    # dFrame = engine_configurations()
-    # engine_config_plots(dFrame, [7, 9, 9], Ts3max, 0, 0)
-    # print(assignment5(dFrame))
-    # ans6 = assignment6()
-    # assignment7()
-    # airfoil_count()
     rfp2()
