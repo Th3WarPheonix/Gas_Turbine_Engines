@@ -241,8 +241,9 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     plt.subplots_adjust(wspace=.4, hspace=.7)
 
     comp_temp = dfConfigs.loc['3 Compressor Exit', 'Total Temperature Actual (R)'] - 460
-    axs[0,0].plot([comp_press_ratio[1], comp_press_ratio[4]], [comp_temp[1], comp_temp[4]], color='pink')
-    axs[0,0].plot([comp_press_ratio[2], comp_press_ratio[3]], [comp_temp[2], comp_temp[3]], color='pink')
+    axs[0,0].plot([comp_press_ratio[1], comp_press_ratio[4]], [comp_temp[1], comp_temp[4]], color='green')
+    axs[0,0].plot([comp_press_ratio[2], comp_press_ratio[3]], [comp_temp[2], comp_temp[3]], color='green')
+    axs[0,0].fill_between([comp_press_ratio[1], comp_press_ratio[4]], [comp_temp[1], comp_temp[4]], Tt3max, label='Design Space', alpha=.5, color='gray')
     axs[0,0].scatter(comp_press_ratio[1:4], comp_temp[1:4], marker='.', label='Configs', s=75)
     axs[0,0].scatter(comp_press_ratio[-1], comp_temp[-1], marker='.', color='red', label='Extra')
     axs[0,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
@@ -252,8 +253,9 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     axs[0,0].legend()
 
     Tt495s = convert_temps(dfConfigs.loc['4.95 LPT Entrance', 'Total Temperature (R)'], 'SI')-273
-    axs[0,1].plot([comp_press_ratio[1], comp_press_ratio[4]], [Tt495s[1], Tt495s[4]], color='pink')
-    axs[0,1].plot([comp_press_ratio[2], comp_press_ratio[3]], [Tt495s[2], Tt495s[3]], color='pink')
+    axs[0,1].plot([comp_press_ratio[1], comp_press_ratio[4]], [Tt495s[1], Tt495s[4]], color='green')
+    axs[0,1].plot([comp_press_ratio[2], comp_press_ratio[3]], [Tt495s[2], Tt495s[3]], color='green')
+    axs[0,1].fill_between([comp_press_ratio[1], comp_press_ratio[4]], [Tt495s[1], Tt495s[4]], Tt495max, label='Design Space', alpha=.5, color='gray')
     axs[0,1].scatter(comp_press_ratio[1:4], Tt495s[1:4], marker='.', label='Configs', s=75)
     axs[0,1].scatter(comp_press_ratio[-1], Tt495s[-1], marker='.', color='red', label='Extra')
     axs[0,1].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
@@ -263,8 +265,9 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     axs[0,1].legend()
 
     fuel_burn = dfConfigs.loc['Summary', 'Fuel Burn (gal)']
-    axs[1,0].plot([comp_press_ratio[1], comp_press_ratio[4]], [fuel_burn[1], fuel_burn[4]], color='pink')
-    axs[1,0].plot([comp_press_ratio[2], comp_press_ratio[3]], [fuel_burn[2], fuel_burn[3]], color='pink')
+    axs[1,0].plot([comp_press_ratio[1], comp_press_ratio[4]], [fuel_burn[1], fuel_burn[4]], color='green')
+    axs[1,0].plot([comp_press_ratio[2], comp_press_ratio[3]], [fuel_burn[2], fuel_burn[3]], color='green')
+    axs[1,0].fill_between([comp_press_ratio[1], comp_press_ratio[4]], [fuel_burn[1], fuel_burn[4]], Fuel_Vol, label='Design Space', alpha=.5, color='gray')
     axs[1,0].scatter(comp_press_ratio[1:4], fuel_burn[1:4], marker='.', label='Configs', s=75)
     axs[1,0].scatter(comp_press_ratio[-1], fuel_burn[-1], marker='.', color='red', label='Extra')
     axs[1,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
@@ -274,8 +277,9 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     axs[1,0].legend()
 
     diam = dfConfigs.loc['Summary', 'Inlet Diameter (in)']
-    axs[1,1].plot([comp_press_ratio[1], comp_press_ratio[4]], [diam[1], diam[4]], color='pink')
-    axs[1,1].plot([comp_press_ratio[2], comp_press_ratio[3]], [diam[2], diam[3]], color='pink')
+    axs[1,1].plot([comp_press_ratio[1], comp_press_ratio[4]], [diam[1], diam[4]], color='green')
+    axs[1,1].plot([comp_press_ratio[2], comp_press_ratio[3]], [diam[2], diam[3]], color='green')
+    axs[1,1].fill_between([comp_press_ratio[1], comp_press_ratio[4]], [diam[1], diam[4]], max_diam, label='Design Space', alpha=.5, color='gray')
     axs[1,1].scatter(comp_press_ratio[1:4], diam[1:4], marker='.', label='Configs', s=75)
     axs[1,1].scatter(comp_press_ratio[-1], diam[-1], marker='.', color='red', label='Extra')
     axs[1,1].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
