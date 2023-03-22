@@ -244,7 +244,7 @@ def engine_configurations(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan
         stations, dfResult  = engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio[i], comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust[i], gamma_hot)
         dfConfigi = pd.DataFrame(pd.concat(stations), columns=['{}_{}_{}'.format(comp_press_ratio[i], int(convert_temps(Tt4[i], 'imp')-460), bypass_ratio[i])])
         dfConfigs = pd.concat([dfConfigs, dfConfigi], axis=1)
-        dfResult.to_csv('Result_Config_{}_{}_{}.csv'.format(comp_press_ratio[i], int(convert_temps(Tt4[i], 'imp')-460), bypass_ratio[i]))
+        # dfResult.to_csv('Result_Config_{}_{}_{}.csv'.format(comp_press_ratio[i], int(convert_temps(Tt4[i], 'imp')-460), bypass_ratio[i]))
     dfConfigs.index = dfConfigs.index.rename(['Station','Property'])
     dfConfigs.to_csv('Engine Configurations.csv')
     return dfConfigs
@@ -315,7 +315,7 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     axs[1,1].set_title('Engine Diameter vs\nCompressor Pressure Ratio')
     axs[1,1].legend(loc='upper right')
 
-    plt.savefig('Config_plots.png')
+    # plt.savefig('Config_plots.png')
     plt.show()
 
 def rfp2():
