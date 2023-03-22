@@ -250,48 +250,70 @@ def engine_configurations(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan
     return dfConfigs
     
 def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol, max_diam):
-    fig, axs = plt.subplots(2,2, figsize=(10, 7))
+    fig, axs = plt.subplots(2,2, figsize=(13, 8))
     plt.subplots_adjust(wspace=.4, hspace=.7)
 
     comp_temp = dfConfigs.loc['3 Compressor Exit', 'Total Temperature Actual (R)'] - 460
-    axs[0,0].plot([comp_press_ratio[1], comp_press_ratio[4]], [comp_temp[1], comp_temp[4]], color='green')
-    axs[0,0].plot([comp_press_ratio[2], comp_press_ratio[3]], [comp_temp[2], comp_temp[3]], color='green')
-    axs[0,0].scatter(comp_press_ratio[1:], comp_temp[1:], marker='.', label='Configs', s=75)
+    slope1 = (comp_temp[1]-comp_temp[4])/(comp_press_ratio[1]-comp_press_ratio[4])
+    pinch_point1 = (Tt3max - comp_temp[4])/(slope1)+comp_press_ratio[4]
+    axs[0,0].plot([comp_press_ratio[1], comp_press_ratio[4]], [comp_temp[1], comp_temp[4]], color='green', zorder=1)
+    axs[0,0].plot([comp_press_ratio[2], comp_press_ratio[3]], [comp_temp[2], comp_temp[3]], color='green', zorder=1)
+    axs[0,0].scatter(comp_press_ratio[1:5], comp_temp[1:5], marker='.', label='Configs', s=75, zorder=2)
+    # axs[0,0].scatter(comp_press_ratio[0], comp_temp[0], marker='.', label='Turbofan', s=75, zorder=2)
+    axs[0,0].scatter(comp_press_ratio[5], comp_temp[5], marker='.', label='Concept', s=75, color='red', zorder=2)
+    axs[0,0].scatter([pinch_point1], [Tt3max], color='chartreuse', zorder=2, label='Pinch Point {}'.format(round(pinch_point1, 1)))
+    axs[0,0].axhline(Tt3max, linestyle='--', label='RFP Limit', color='orange', zorder=1)
     axs[0,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[0,0].set_ylabel('Compressor Exit\nTemperature $T_{t_3}$ ($^\circ$F)')
-    axs[0,0].axhline(Tt3max, linestyle='--', label='RFP Limit', color='orange')
     axs[0,0].set_title('Compressor Exit Temperature vs\nCompressor Pressure Ratio')
-    axs[0,0].legend()
+    axs[0,0].legend(loc='upper left')
 
     Tt495s = convert_temps(dfConfigs.loc['4.95 LPT Entrance', 'Total Temperature (R)'], 'SI')-273
-    axs[0,1].plot([comp_press_ratio[1], comp_press_ratio[4]], [Tt495s[1], Tt495s[4]], color='green')
-    axs[0,1].plot([comp_press_ratio[2], comp_press_ratio[3]], [Tt495s[2], Tt495s[3]], color='green')
-    axs[0,1].scatter(comp_press_ratio[1:], Tt495s[1:], marker='.', label='Configs', s=75)
+    slope2 = (Tt495s[1]-Tt495s[4])/(comp_press_ratio[1]-comp_press_ratio[4])
+    pinch_point2 = (Tt495max - Tt495s[4])/(slope2)+comp_press_ratio[4]
+    axs[0,1].plot([comp_press_ratio[1], comp_press_ratio[4]], [Tt495s[1], Tt495s[4]], color='green', zorder=1)
+    axs[0,1].plot([comp_press_ratio[2], comp_press_ratio[3]], [Tt495s[2], Tt495s[3]], color='green', zorder=1)
+    axs[0,1].scatter(comp_press_ratio[1:5], Tt495s[1:5], marker='.', label='Configs', s=75, zorder=2)
+    # axs[0,1].scatter(comp_press_ratio[0], Tt495s[0], marker='.', label='Turbofan', s=75, zorder=2)
+    axs[0,1].scatter(comp_press_ratio[5], Tt495s[5], marker='.', label='Concept', s=75, color='red', zorder=2)
+    axs[0,1].scatter([pinch_point2], [Tt495max], color='chartreuse', zorder=2, label='Pinch Point {}'.format(round(pinch_point2, 1)))
+    axs[0,1].axhline(Tt495max, linestyle='--', label='RFP Limit', color='orange', zorder=1)
     axs[0,1].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[0,1].set_ylabel('Exhaust Gas\nTemperature $T_{t_{4.95}}$ ($^\circ$C)')
-    axs[0,1].axhline(Tt495max, linestyle='--', label='RFP Limit', color='orange')
     axs[0,1].set_title('Exhaust Gas Temperature vs\nCompressor Pressure Ratio')
-    axs[0,1].legend()
+    axs[0,1].legend(loc='upper right')
 
     fuel_burn = dfConfigs.loc['Summary', 'Fuel Burn (gal)']
-    axs[1,0].plot([comp_press_ratio[1], comp_press_ratio[4]], [fuel_burn[1], fuel_burn[4]], color='green')
-    axs[1,0].plot([comp_press_ratio[2], comp_press_ratio[3]], [fuel_burn[2], fuel_burn[3]], color='green')
-    axs[1,0].scatter(comp_press_ratio[1:], fuel_burn[1:], marker='.', label='Configs', s=75)
+    slope3 = (fuel_burn[1]-fuel_burn[4])/(comp_press_ratio[1]-comp_press_ratio[4])
+    pinch_point3 = (Fuel_Vol - fuel_burn[4])/(slope3)+comp_press_ratio[4]
+    slope3b = (fuel_burn[2]-fuel_burn[3])/(comp_press_ratio[2]-comp_press_ratio[3])
+    pinch_point3b = (Fuel_Vol - fuel_burn[3])/(slope3b)+comp_press_ratio[3]
+    axs[1,0].plot([comp_press_ratio[1], comp_press_ratio[4]], [fuel_burn[1], fuel_burn[4]], color='green', zorder=1)
+    axs[1,0].plot([comp_press_ratio[2], comp_press_ratio[3]], [fuel_burn[2], fuel_burn[3]], color='green', zorder=1)
+    axs[1,0].scatter(comp_press_ratio[1:5], fuel_burn[1:5], marker='.', label='Configs', s=75, zorder=2)
+    # axs[1,0].scatter(comp_press_ratio[0], fuel_burn[0], marker='.', label='Turbofan', s=75, zorder=2)
+    axs[1,0].scatter(comp_press_ratio[5], fuel_burn[5], marker='.', label='Concept', s=75, color='red', zorder=2)
+    axs[1,0].scatter([pinch_point3, pinch_point3b], [Fuel_Vol, Fuel_Vol], color='chartreuse', zorder=2, label='Pinch Point {}, {}'.format(round(pinch_point3, 1), round(pinch_point3b, 1)))
+    axs[1,0].axhline(Fuel_Vol, linestyle='--', label='RFP Limit', color='orange', zorder=1)
     axs[1,0].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[1,0].set_ylabel('Fuel Burned (gal)')
-    axs[1,0].axhline(Fuel_Vol, linestyle='--', label='RFP Limit', color='orange')
     axs[1,0].set_title('Mission fuel burn vs\nCompressor Pressure Ratio')
-    axs[1,0].legend()
+    axs[1,0].legend(loc='upper right')
 
     diam = dfConfigs.loc['Summary', 'Inlet Diameter (in)']
-    axs[1,1].plot([comp_press_ratio[1], comp_press_ratio[4]], [diam[1], diam[4]], color='green')
-    axs[1,1].plot([comp_press_ratio[2], comp_press_ratio[3]], [diam[2], diam[3]], color='green')
-    axs[1,1].scatter(comp_press_ratio[1:], diam[1:], marker='.', label='Configs', s=75)
+    slope4 = (diam[1]-diam[4])/(comp_press_ratio[1]-comp_press_ratio[4])
+    pinch_point4 = (max_diam - diam[4])/(slope4)+comp_press_ratio[4]
+    axs[1,1].plot([comp_press_ratio[1], comp_press_ratio[4]], [diam[1], diam[4]], color='green', zorder=1)
+    axs[1,1].plot([comp_press_ratio[2], comp_press_ratio[3]], [diam[2], diam[3]], color='green', zorder=1)
+    axs[1,1].scatter(comp_press_ratio[1:5], diam[1:5], marker='.', label='Configs', s=75, zorder=2)
+    # axs[1,1].scatter(comp_press_ratio[0], diam[0], marker='.', label='Turbofan', s=75, zorder=2)
+    axs[1,1].scatter(comp_press_ratio[5], diam[5], marker='.', label='Concept', s=75, color='red', zorder=2)
+    axs[1,1].scatter([pinch_point4], [max_diam], color='chartreuse', zorder=2, label='Pinch Point {}'.format(round(pinch_point4, 1)))
+    axs[1,1].axhline(max_diam, linestyle='--', label='RFP Limit', color='orange', zorder=1)
     axs[1,1].set_xlabel('Compressor Pressure Ratio $\dfrac{P_{t_3}}{P_{t_2}}$')
     axs[1,1].set_ylabel('Engine Inlet Diameter (in)')
-    axs[1,1].axhline(max_diam, linestyle='--', label='RFP Limit', color='orange')
     axs[1,1].set_title('Engine Diameter vs\nCompressor Pressure Ratio')
-    axs[1,1].legend()
+    axs[1,1].legend(loc='upper right')
 
     plt.savefig('Config_plots.png')
     plt.show()
@@ -299,7 +321,7 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
 def rfp2():
     # General values
     alt = 30000 # ft
-    thrust = [4800, 4800, 4800, 4800, 4800] # lbf
+    thrust = [4800, 4800, 4800, 4800, 4800, 4800] # lbf
     spec_trust = 98.4 # lbf/lbmass flow through compressor
     fuel_vol = 1600 # gallons
     # Ambient values
@@ -310,12 +332,12 @@ def rfp2():
     inlet_press_rec = .99
     # Fan values
     mach1 = .4
-    bypass = [2, 0, 0, 0, 0]
+    bypass = [2, 0, 0, 0, 0, 0]
     fan_press_ratio = 1.6 # pt13/pt1
     inlet_diam = 51.6 # in
     fan_eff = .88
     # Compressor values
-    comp_press_ratio = [7, 7, 9, 7, 9] # pt3/pt2
+    comp_press_ratio = [7, 7, 9, 7, 9, 8.49] # pt3/pt2
     massflow2 = 71.2 # lbm
     comp_eff = .87
     comp_leak_flow = .01
@@ -326,7 +348,7 @@ def rfp2():
     comb_press_drop = .95 # Pt4/Pt3
     comb_eff = .995 # actual heat/ ideal heat
     LHV = 18550 # BTU/lbmfuel
-    turbine_inlet_temp = [2100, 2100, 2200, 2200, 2100] # F
+    turbine_inlet_temp = [2100, 2100, 2200, 2200, 2100, 2125] # F
     comb_eff = .995
     gamma_hot = 4/3
     # Turbine values
