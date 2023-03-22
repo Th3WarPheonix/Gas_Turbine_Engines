@@ -149,11 +149,12 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
         Tt1, Pt1, Ts1, Ps1, Vel1, rhos1, rhot1 = inlet(mach1, Tt0, Pt0, inlet_press_rec)
         Tt13i, Tt13a, Pt13, Wfi, Wfa = compressor(Tt1, Pt1, fan_eff, fan_press_ratio, bypass_ratio) # Fan
         Tt3i, Tt3a, Pt3, Wci, Wca = compressor(Tt13a, Pt13, comp_eff, comp_press_ratio, 0)
-
         fuel_air_ratio, Pt4       = combustor(Tt3a, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot)
         Tt49, Tt5, Pt49, Pt5, massflow5, Tt495 = turbine(Tt4, Pt4, Tt3a, m31+fuel_air_ratio, Wca, Wfa, turbine_cool_flow, core_turb_eff, fan_turb_eff, gamma_hot)
         Ts9i, Ts9a, Pt9, Vel9     = nozzle(Tt5, Pt5, Pambient, vel_coeff_core) # Core
         Ts19i, Ts19a, Pt19, Vel19 = nozzle(Tt13a, Pt13, Pambient, vel_coeff_fan) # Fan
+        Tt2 = Tt13a
+        Pt2 = Pt13
     else: # Turbojet
         Tt0, Pt0, rhos0, rhot0    = ambient_properties(mach0, Tambient, Pambient)
         Tt1, Pt1, Ts1, Ps1, Vel1, rhos1, rhot1  = inlet(mach1, Tt0, Pt0, inlet_press_rec)
@@ -162,6 +163,8 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
         Tt49, Tt5, Pt49, Pt5, massflow5, Tt495 = turbine(Tt4, Pt4, Tt3a, m31+fuel_air_ratio, Wca, 0, turbine_cool_flow, core_turb_eff, fan_turb_eff, gamma_hot)
         Ts9i, Ts9a, Pt9, Vel9     = nozzle(Tt5, Pt5, Pambient, vel_coeff_core) # Core
         Vel19, Tt13i, Tt13a, Wfi, Wfa, Ts19i, Ts19a, Pt13, Pt19 = 0,0,0,0,0,0,0,0,0 # Fan specific variables
+        Tt2 = Tt1
+        Pt2 = Pt1
 
     # Calculate the mass flow of air into the compressor based on thrust required
     Vel0 = mach0*np.sqrt(gamma*R_gas*Tambient)
@@ -181,10 +184,10 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     inlet_diameter = np.sqrt(inlet_area*4/np.pi)
     inlet_diameter_emp = inlet_diameter/.0254
     # Conversions
-    temperautres_emps = convert_temps([Tambient, Tt0, Tt1, Ts1, Tt13i, Tt13a, Tt3i, Tt3a, Tt4, Tt49, Tt495, Tt5, Ts9i, Ts9a, Ts19i, Ts19a], 'imp')
-    Ts0_emp, Tt0_emp, Tt1_emp, Ts1_emp, Tt13i_emp, Tt13a_emp, Tt3i_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt495_emp, Tt5_emp, Ts9i_emp, Ts9a_emp, Ts19i_emp, Ts19a_emp = temperautres_emps
-    pressures_emps = convert_pressures([Pambient, Pt0, Pt1, Ps1, Pt13, Pt3, Pt4, Pt49, Pt5, Pambient, Pt9, Pt19], 'imp')
-    Ps0_emp, Pt0_emp, Pt1_emp, Ps1_emp, Pt13_emp, Pt3_emp, Pt4_emp, Pt49_emp, Pt5_emp, Ps9_emp, Pt9_emp, Pt19_emp = pressures_emps
+    temperautres_emps = convert_temps([Tambient, Tt0, Tt1, Ts1, Tt2, Tt13i, Tt13a, Tt3i, Tt3a, Tt4, Tt49, Tt495, Tt5, Ts9i, Ts9a, Ts19i, Ts19a], 'imp')
+    Ts0_emp, Tt0_emp, Tt1_emp, Ts1_emp, Tt2_emp, Tt13i_emp, Tt13a_emp, Tt3i_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt495_emp, Tt5_emp, Ts9i_emp, Ts9a_emp, Ts19i_emp, Ts19a_emp = temperautres_emps
+    pressures_emps = convert_pressures([Pambient, Pt0, Pt1, Ps1, Pt2, Pt13, Pt3, Pt4, Pt49, Pt5, Pambient, Pt9, Pt19], 'imp')
+    Ps0_emp, Pt0_emp, Pt1_emp, Ps1_emp, Pt2_emp, Pt13_emp, Pt3_emp, Pt4_emp, Pt49_emp, Pt5_emp, Ps9_emp, Pt9_emp, Pt19_emp = pressures_emps
     Vel1_emp = Vel1 / 12 / .0254
     Vel9_emp = Vel9 / 12 / .0254
     Vel19_emp = Vel19 / 12 / .0254
@@ -225,8 +228,8 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     stationSummary = pd.Series([thrust, massflow2_emp, thrust/massflow2_emp, fuelvol_burned, inlet_diameter_emp], index=[np.repeat('Summary', len(labelsSummary)), labelsSummary])
     
     # Pt0_emp, (1+bypass_ratio)*massflow2_emp
-    total_temps = (Tt0_emp, Tt1_emp, Tt13a_emp, Tt3a_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt495_emp, Tt5_emp, Tt5_emp, Tt13a_emp, Tt13a_emp)
-    total_press = (Pt0_emp, Pt1_emp, Pt13_emp, Pt3_emp, Pt3_emp, Pt4_emp, Pt49_emp, Pt49_emp, Pt5_emp, Pt5_emp, Pt13_emp, Pt13_emp)
+    total_temps = (Tt0_emp, Tt1_emp, Tt2_emp, Tt3a_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt495_emp, Tt5_emp, Tt5_emp, Tt13a_emp, Tt13a_emp)
+    total_press = (Pt0_emp, Pt1_emp, Pt2_emp, Pt3_emp, Pt3_emp, Pt4_emp, Pt49_emp, Pt49_emp, Pt5_emp, Pt5_emp, Pt13_emp, Pt13_emp)
     total_mass = ((1+bypass_ratio)*massflow2_emp, (1+bypass_ratio)*massflow2_emp, massflow2_emp, massflow2_emp, massflow2_emp*m31, massflow2_emp*m31, massflow2_emp*m31, massflow2_emp*massflow5, massflow2_emp*massflow5, massflow2_emp*massflow5, bypass_ratio*massflow2_emp, bypass_ratio*massflow2_emp)
     config_temps = pd.Series(total_temps, index=[np.array([0, 1, 2, 3, 3.1, 4, 4.9, 4.95, 5, 9, 13, 19], dtype=str)], name='Temperature (R)')
     config_press = pd.Series(total_press, index=[np.array([0, 1, 2, 3, 3.1, 4, 4.9, 4.95, 5, 9, 13, 19], dtype=str)], name='Pressure (psia)')
@@ -239,9 +242,9 @@ def engine_configurations(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan
     dfConfigs = pd.DataFrame()
     for i in range(len(comp_press_ratio)):
         stations, dfResult  = engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio[i], comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust[i], gamma_hot)
-        dfConfigi = pd.DataFrame(pd.concat(stations), columns=['Config {}'.format(i+1)])
+        dfConfigi = pd.DataFrame(pd.concat(stations), columns=['{}_{}_{}'.format(comp_press_ratio[i], int(convert_temps(Tt4[i], 'imp')-460), bypass_ratio[i])])
         dfConfigs = pd.concat([dfConfigs, dfConfigi], axis=1)
-        dfResult.to_csv('Result_Config_{}_{}.csv'.format(comp_press_ratio[i], round(convert_temps(Tt4[i], 'imp')-460, 0)))
+        dfResult.to_csv('Result_Config_{}_{}_{}.csv'.format(comp_press_ratio[i], int(convert_temps(Tt4[i], 'imp')-460), bypass_ratio[i]))
     dfConfigs.index = dfConfigs.index.rename(['Station','Property'])
     dfConfigs.to_csv('Engine Configurations.csv')
     return dfConfigs
