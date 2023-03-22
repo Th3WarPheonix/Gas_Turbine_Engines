@@ -3,7 +3,7 @@ import numpy as np
 import IsentropicFlow as isenf
 import RootFinding as rootfind
 
-def convert_temps(temps, to:str):
+def convert_temps(temps, to:str='SI'):
     """Convert the temperature from K to R"""
     con_factor = 1.8
     if to == 'imp':
@@ -19,7 +19,7 @@ def convert_temps(temps, to:str):
         except:
             return np.array(temps)/con_factor
 
-def convert_mass(mass, to:str):
+def convert_mass(mass, to:str='SI'):
     """Convert the temperature from lbm to kg"""
     con_factor = 2.20462
     if to == 'imp':
@@ -35,8 +35,7 @@ def convert_mass(mass, to:str):
         except:
             return np.array(mass)/con_factor
 
-
-def convert_pressures(pressures, to:str):
+def convert_pressures(pressures, to:str='SI'):
     """Convert the pressure from Pa to psia"""
     con_factor = 6895.0
     if to == 'imp':
@@ -52,7 +51,7 @@ def convert_pressures(pressures, to:str):
         except:
             return np.array(pressures)*con_factor
 
-def convert_work(works, to:str):
+def convert_work(works, to:str='SI'):
     """Convert the work from J to Btu"""
     if to == 'imp':
         try:
@@ -68,7 +67,6 @@ def convert_work(works, to:str):
             return np.array(works) * 1055 * 2.205
         
 def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0AHL:float, mach_throat:float, Tt0:float, Pt0:float, Ts1:float, Ps1:float, mach_fan:float, diffuser_angle:float, gamma:float=1.4, R_gas:float=287.05):
-
     '''Entrance calcs'''
     streamtube_area = massflow/(stream_velocity*stream_density)
     streamtube_diameter = np.sqrt(4*streamtube_area/np.pi)
@@ -181,55 +179,6 @@ def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, tot
     velocity2 = mach2*np.sqrt(gamma*R_gas*Ts2)
     
     return ((inlet_hub_radius*2, outlet_hub_diam, avg_gap, avg_blade_height), spool_speed_rpm, num_stages, compressor_length)
-
-def assignment5(dfConfigs, R_gas=287.05):
-    Tt0 = convert_temps(dfConfigs['Config 1'].loc['0 Freestream', 'Total Temperature (R)'], 'SI')
-    Pt0 = convert_pressures(dfConfigs['Config 1'].loc['0 Freestream', 'Total Pressure (psia)'], 'SI')
-    Ts0 = convert_temps(dfConfigs['Config 1'].loc['0 Freestream', 'Static Temperature (R)'], 'SI')
-    Ps0 = convert_pressures(dfConfigs['Config 1'].loc['0 Freestream', 'Static Pressure (psia)'], 'SI')
-    Ts1 = convert_temps(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Temperature (R)'], 'SI')
-    Ps1 = convert_pressures(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Pressure (psia)'], 'SI')
-
-    '''Inlet Design'''
-    density0 = Ps0/(R_gas*Ts0)
-    velocity0 = 795.5 # ft/s
-    velocity0 = velocity0 * 12*.0254
-    massflow0 = 70.17 # lbm/s
-    massflow0 = massflow0/2.205
-    A0Ahl = .7
-    throat_mach = .7
-    fan_mach = .4
-    diffuser_angle = 5
-    diams, diff_length, diff_LH = inlet_design(density0, velocity0, massflow0, A0Ahl, throat_mach, Tt0, Pt0, Ts1, Ps1, fan_mach, diffuser_angle)
-    return (diams/.0254, diff_length/.0254, diff_LH)
-
-def assignment6():
-    """Compressor Design"""
-    Tt2 = 464.5 # R
-    Pt2 = 6.58 # psia
-    massflow2 = 70.17 # lbm/s
-    Tt31 = 897.7 # R
-    Pt31 = 52.67 # psia
-    mach31 = .3
-    massflow31 = 63.15 # lbm/s
-    work_coeff = .6
-    total_work = 103.97 # Btu/(lbm/sec)
-    comp_press_ratio = 8
-    comp_eff = .87
-    aspect_ratio = 2.5 # height to width ratio
-    inlet_radius_ratio = .4 # hub radius to tip radius ratio
-    max_tip_diam = 29.58 # in
-    max_tip_speed = 1500 # ft/s
-
-    Tt2, Tt31 = convert_temps([Tt2, Tt31], 'SI')
-    Pt2, Pt31 = convert_pressures([Pt2, Pt31], 'SI')
-    massflow2 = massflow2/2.205
-    massflow31 = massflow31/2.205
-    max_tip_diam *= .0254 # m
-    max_tip_speed *= 12*.0254 # m/s
-    total_work = convert_work(total_work, 'SI') # J/(kg/s)
-
-    return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
 
 def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages, Dt1, Dp1, Dp2, flow_area3, spool_speed, stage_eff, loss_coeffr, loss_coeffs, reaction, alpha3, gamma=1.4, R_gas=287.05):
     '''Calculations are acrosss one stage of a compressor. The subscripts denote stations across the stage.
@@ -362,6 +311,55 @@ def airfoil_count():
     
     return num_airfoils
 
+def assignment5(dfConfigs, R_gas=287.05):
+    Tt0 = convert_temps(dfConfigs['Config 1'].loc['0 Freestream', 'Total Temperature (R)'], 'SI')
+    Pt0 = convert_pressures(dfConfigs['Config 1'].loc['0 Freestream', 'Total Pressure (psia)'], 'SI')
+    Ts0 = convert_temps(dfConfigs['Config 1'].loc['0 Freestream', 'Static Temperature (R)'], 'SI')
+    Ps0 = convert_pressures(dfConfigs['Config 1'].loc['0 Freestream', 'Static Pressure (psia)'], 'SI')
+    Ts1 = convert_temps(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Temperature (R)'], 'SI')
+    Ps1 = convert_pressures(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Pressure (psia)'], 'SI')
+
+    '''Inlet Design'''
+    density0 = Ps0/(R_gas*Ts0)
+    velocity0 = 795.5 # ft/s
+    velocity0 = velocity0 * 12*.0254
+    massflow0 = 70.17 # lbm/s
+    massflow0 = massflow0/2.205
+    A0Ahl = .7
+    throat_mach = .7
+    fan_mach = .4
+    diffuser_angle = 5
+    diams, diff_length, diff_LH = inlet_design(density0, velocity0, massflow0, A0Ahl, throat_mach, Tt0, Pt0, Ts1, Ps1, fan_mach, diffuser_angle)
+    return (diams/.0254, diff_length/.0254, diff_LH)
+
+def assignment6():
+    """Compressor Design"""
+    Tt2 = 464.5 # R
+    Pt2 = 6.58 # psia
+    massflow2 = 70.17 # lbm/s
+    Tt31 = 897.7 # R
+    Pt31 = 52.67 # psia
+    mach31 = .3
+    massflow31 = 63.15 # lbm/s
+    work_coeff = .6
+    total_work = 103.97 # Btu/(lbm/sec)
+    comp_press_ratio = 8
+    comp_eff = .87
+    aspect_ratio = 2.5 # height to width ratio
+    inlet_radius_ratio = .4 # hub radius to tip radius ratio
+    max_tip_diam = 29.58 # in
+    max_tip_speed = 1500 # ft/s
+
+    Tt2, Tt31 = convert_temps([Tt2, Tt31], 'SI')
+    Pt2, Pt31 = convert_pressures([Pt2, Pt31], 'SI')
+    massflow2 = massflow2/2.205
+    massflow31 = massflow31/2.205
+    max_tip_diam *= .0254 # m
+    max_tip_speed *= 12*.0254 # m/s
+    total_work = convert_work(total_work, 'SI') # J/(kg/s)
+
+    return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
+
 def assignment7():
     Tt1 = 464.5 # R
     Pt1 = 6.58 # psia
@@ -396,3 +394,59 @@ def assignment7():
     spool_speed_rads = spool_speed_rpm*2*np.pi/60
         
     compressor_vel_diagrams(Tt1, Pt1, massflow1, alpha1, comp_press_ratio, num_stages, Dt1, Dp1, Dp2, area3, spool_speed_rads, stage_eff, loss_coeff_r, loss_coeff_s, reaction, alpha3)
+
+
+def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, gamma=1.4, R_gas=287.05):
+    rhot31 = Pt31/R_gas/Tt31
+    ref_area = airflow/rhot31/ref_vel
+    ref_height = ref_area/np.pi/pitch_diam
+    diam_inner_casing = (pitch_diam/2 - ref_height/2)*2
+    diam_outer_casing = (pitch_diam/2 + ref_height/2)*2
+
+    area_passage = flow_split*airflow/rhot31/passage_vel  
+    height_passage = area_passage/np.pi/pitch_diam
+    diam_inner_pass = (pitch_diam/2 - height_passage/2)*2
+    diam_outer_pass = (pitch_diam/2 + height_passage/2)*2
+
+    print(diam_inner_pass/.0254, diam_outer_pass/.0254)
+
+def assignment8():
+    # Compressor parameters
+    Tt31 = 897.1 # R
+    Pt31 = 52.64 # psia
+    airflow = 62.86 # lbm/s
+    pitch_diam = 28.02 # in
+    tip_diam = 29.51 # in
+    # Combustor parameters
+    Tt4 = 2560 # R
+    Pt4 = 50.01 # psia
+    fuelflow = 1.55 # lbm/s
+    LHV = 18550 # Btu/lbm
+    max_diam_casing = 42 # in
+    min_diam_casing = 13 # in
+    lengthheight = 2
+    wall_angle = 5 # deg
+    flow_split = 1/3
+    # Initial parameters
+    ref_vel = 90 # ft/sec max = 100
+    passage_vel = 150 # ft/sec max=180
+    dome_vel = 80 # ft/sec
+    space_rate = 8e6 # btu/hr/atm/ft^3
+    comblengthdomeheight = 2.25 # ratio max = 2.5
+    # Conversions
+    Tt31, Tt4 = convert_temps([Tt31, Tt4])
+    Pt31, Pt4 = convert_pressures([Pt31, Pt4])
+    airflow, fuelflow = convert_mass([airflow, fuelflow])
+    pitch_diam *= .0254
+    tip_diam *=.0254
+    max_diam_casing *= .0254
+    min_diam_casing *= .0254
+    wall_angle *= np.pi/180
+    ref_vel *= .0254*12
+    dome_vel *= .0254*12
+    passage_vel *= .0254*12
+
+    combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel)
+
+if __name__ == '__main__':
+    assignment8()
