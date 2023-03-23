@@ -429,7 +429,7 @@ def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel,
     Ps31_atm = Pt31/101300
     comb_vol_ft3 = comb_vol/(.0254*12)**3
     space_rate = 3600*fuel_air*airflow_lb*LHV/Ps31_atm/comb_vol_ft3
-    print(space_rate)
+
     if not 8e6 < space_rate < 10e6:
         print('---ERROR: SPACE RATE EXCCEEDS LIMITS---')
         print('Recommended action: change length to height ratio, then dome velocity')
