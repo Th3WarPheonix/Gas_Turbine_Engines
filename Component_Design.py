@@ -396,19 +396,54 @@ def assignment7():
     compressor_vel_diagrams(Tt1, Pt1, massflow1, alpha1, comp_press_ratio, num_stages, Dt1, Dp1, Dp2, area3, spool_speed_rads, stage_eff, loss_coeff_r, loss_coeff_s, reaction, alpha3)
 
 
-def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, gamma=1.4, R_gas=287.05):
+def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, max_dome_vel, comblendomeheight, fuelflow, LHV, length_height, wall_angle,  gamma=1.4, R_gas=287.05):
     rhot31 = Pt31/R_gas/Tt31
     ref_area = airflow/rhot31/ref_vel
     ref_height = ref_area/np.pi/pitch_diam
     diam_inner_casing = (pitch_diam/2 - ref_height/2)*2
     diam_outer_casing = (pitch_diam/2 + ref_height/2)*2
 
+    if diam_inner_casing < min_diam_casing or diam_outer_casing > max_diam_casing:
+        print('---ERROR: CASING DIAMETER EXCEEDS LIMITS---')
+        print('Recommended action: change reference velocity')
+
     area_passage = flow_split*airflow/rhot31/passage_vel  
     height_passage = area_passage/np.pi/pitch_diam
-    diam_inner_pass = (pitch_diam/2 - height_passage/2)*2
-    diam_outer_pass = (pitch_diam/2 + height_passage/2)*2
+    diam_inner_pass = (diam_inner_casing/2 + height_passage)*2
+    diam_outer_pass = (diam_outer_casing/2 - height_passage)*2
 
-    print(diam_inner_pass/.0254, diam_outer_pass/.0254)
+    dome_height = (diam_outer_pass - diam_inner_pass)/2
+    area_dome = dome_height*np.pi*pitch_diam
+    dome_vel = flow_split*airflow/rhot31/area_dome
+
+    if dome_vel > max_dome_vel:
+        print('---ERROR: DOME VELOCITY EXCEEDS MAXIMUM---')
+        print('Recommended action: reduce reference velocity')
+        print('Dome Vel: {} \t Max: {}'.format(round(dome_vel, 2), round(max_dome_vel, 2)))
+
+    comb_length = comblendomeheight * dome_height
+    comb_vol = np.pi*dome_height**2/4*comb_length
+    
+    fuel_air = fuelflow/airflow
+    airflow_lb = convert_mass(airflow, 'imp')
+    Ps31_atm = Pt31/101300
+    comb_vol_ft3 = comb_vol/(.0254*12)**3
+    space_rate = 3600*fuel_air*airflow_lb*LHV/Ps31_atm/comb_vol_ft3
+    print(space_rate)
+    if not 8e6 < space_rate < 10e6:
+        print('---ERROR: SPACE RATE EXCCEEDS LIMITS---')
+        print('Recommended action: change length to height ratio, then dome velocity')
+        print('Dome Vel: {:.3e} \t Bounds: {:.3e},{:.3e}'.format(space_rate, 8e6, 10e6))
+
+    diff_area_ratio = 1+2*length_height*np.tan(wall_angle)
+    inlet_area = ref_area/diff_area_ratio
+    inlet_height = np.sqrt(4*inlet_area/np.pi)
+    inlet_length = inlet_height*length_height
+
+    circumference = np.pi*pitch_diam
+    num_nozzles = np.ceil(circumference/dome_height)
+
+    return (num_nozzles, diam_inner_casing, diam_outer_casing, inlet_length)
 
 def assignment8():
     # Compressor parameters
@@ -430,9 +465,9 @@ def assignment8():
     # Initial parameters
     ref_vel = 90 # ft/sec max = 100
     passage_vel = 150 # ft/sec max=180
-    dome_vel = 80 # ft/sec
+    dome_vel_max = 80 # ft/sec
     space_rate = 8e6 # btu/hr/atm/ft^3
-    comblengthdomeheight = 2.25 # ratio max = 2.5
+    comblendomeheight = 2.25 # ratio max = 2.5
     # Conversions
     Tt31, Tt4 = convert_temps([Tt31, Tt4])
     Pt31, Pt4 = convert_pressures([Pt31, Pt4])
@@ -443,10 +478,10 @@ def assignment8():
     min_diam_casing *= .0254
     wall_angle *= np.pi/180
     ref_vel *= .0254*12
-    dome_vel *= .0254*12
+    dome_vel_max *= .0254*12
     passage_vel *= .0254*12
 
-    combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel)
+    combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, dome_vel_max, comblendomeheight, fuelflow, LHV, lengthheight, wall_angle)
 
 if __name__ == '__main__':
     assignment8()
