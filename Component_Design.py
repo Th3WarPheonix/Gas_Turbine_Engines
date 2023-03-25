@@ -2,6 +2,7 @@
 import numpy as np
 import IsentropicFlow as isenf
 import RootFinding as rootfind
+import matplotlib.pyplot as plt
 
 def convert_temps(temps, to:str='SI'):
     """Convert the temperature from K to R"""
@@ -467,7 +468,7 @@ def assignment8():
     passage_vel = 150 # ft/sec max=180
     dome_vel_max = 80 # ft/sec
     space_rate = 8e6 # btu/hr/atm/ft^3
-    comblendomeheight = 2.25 # ratio max = 2.5
+    comblendomeheight = 2.5 # ratio max = 2.5
     # Conversions
     Tt31, Tt4 = convert_temps([Tt31, Tt4])
     Pt31, Pt4 = convert_pressures([Pt31, Pt4])
