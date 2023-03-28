@@ -396,7 +396,6 @@ def assignment7():
         
     compressor_vel_diagrams(Tt1, Pt1, massflow1, alpha1, comp_press_ratio, num_stages, Dt1, Dp1, Dp2, area3, spool_speed_rads, stage_eff, loss_coeff_r, loss_coeff_s, reaction, alpha3)
 
-
 def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, max_dome_vel, comblendomeheight, fuelflow, LHV, length_height, wall_angle,  gamma=1.4, R_gas=287.05):
     rhot31 = Pt31/R_gas/Tt31
     ref_area = airflow/rhot31/ref_vel
@@ -424,13 +423,13 @@ def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel,
 
     comb_length = comblendomeheight * dome_height
     comb_vol = np.pi*dome_height**2/4*comb_length
-    
+
     fuel_air = fuelflow/airflow
     airflow_lb = convert_mass(airflow, 'imp')
     Ps31_atm = Pt31/101300
     comb_vol_ft3 = comb_vol/(.0254*12)**3
     space_rate = 3600*fuel_air*airflow_lb*LHV/Ps31_atm/comb_vol_ft3
-
+    print(space_rate)
     if not 8e6 < space_rate < 10e6:
         print('---ERROR: SPACE RATE EXCCEEDS LIMITS---')
         print('Recommended action: change length to height ratio, then dome velocity')
@@ -468,7 +467,7 @@ def assignment8():
     passage_vel = 150 # ft/sec max=180
     dome_vel_max = 80 # ft/sec
     space_rate = 8e6 # btu/hr/atm/ft^3
-    comblendomeheight = 2.5 # ratio max = 2.5
+    comblendomeheight = 2.25 # ratio max = 2.5
     # Conversions
     Tt31, Tt4 = convert_temps([Tt31, Tt4])
     Pt31, Pt4 = convert_pressures([Pt31, Pt4])
