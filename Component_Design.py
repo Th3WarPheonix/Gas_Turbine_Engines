@@ -312,6 +312,72 @@ def airfoil_count():
     
     return num_airfoils
 
+
+def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, max_dome_vel, comblendomeheight, fuelflow, LHV, length_height, wall_angle, height_turbine_inlet, gamma=1.4, R_gas=287.05):
+    rhot31 = Pt31/R_gas/Tt31
+    ref_area = airflow/rhot31/ref_vel
+    ref_height = ref_area/np.pi/pitch_diam
+    diam_inner_casing = (pitch_diam/2 - ref_height/2)*2
+    diam_outer_casing = (pitch_diam/2 + ref_height/2)*2
+    
+    if diam_inner_casing < min_diam_casing or diam_outer_casing > max_diam_casing:
+        print('---ERROR: CASING DIAMETER EXCEEDS LIMITS---')
+        print('Recommended action: change reference velocity')
+
+    area_passage = flow_split*airflow/rhot31/passage_vel  
+    diam_inner_pass = 2*np.sqrt(diam_inner_casing**2/4 + area_passage/np.pi)
+    diam_outer_pass = 2*np.sqrt(diam_outer_casing**2/4 - area_passage/np.pi)
+    height_inner_pass = (diam_inner_pass - diam_inner_casing)/2
+    height_outer_pass = (diam_outer_casing - diam_outer_pass)/2
+
+    dome_height = ref_height - height_inner_pass - height_outer_pass
+    dome_area = np.pi*dome_height*pitch_diam
+    dome_vel = flow_split*airflow/rhot31/dome_area
+    
+    if dome_vel > max_dome_vel:
+        print('---ERROR: DOME VELOCITY EXCEEDS MAXIMUM---')
+        print('Recommended action: reduce reference velocity')
+        print('Dome Vel: {} \t Max: {}'.format(round(dome_vel, 2), round(max_dome_vel, 2)))
+
+    comb_length = comblendomeheight * dome_height
+    area_entr = ref_height * comb_length/2
+    area_exit = 1/2*(ref_height+height_turbine_inlet)
+    comb_vol = (area_entr+area_exit)*np.pi*pitch_diam*comb_length
+
+    fuel_air = fuelflow/airflow
+    airflow_lb = convert_mass(airflow, 'imp')
+    Ps31_atm = Pt31/101300
+    comb_vol_ft3 = comb_vol/(.0254*12)**3
+    space_rate = 3600*fuel_air*airflow_lb*LHV/Ps31_atm/comb_vol_ft3
+
+    if not 8e6 < space_rate < 10e6:
+        print('---ERROR: SPACE RATE EXCCEEDS LIMITS---')
+        print('Recommended action: change length to height ratio, then dome velocity')
+        print('Dome Vel: {:.3e} \t Bounds: {:.3e},{:.3e}'.format(space_rate, 8e6, 10e6))
+
+    diff_area_ratio = 1+2*length_height*np.tan(wall_angle)
+    inlet_area = ref_area/diff_area_ratio
+    inlet_height = inlet_area/np.pi/pitch_diam
+    inlet_length = inlet_height*length_height
+
+    circumference = np.pi*pitch_diam
+    num_nozzles = np.ceil(circumference/dome_height)
+
+    # print(np.array((ref_area, ref_height, area_passage, height_inner_pass, height_outer_pass, dome_height, dome_area))/.0254)
+    # print()
+    # print('Fuel Nozzles\t', num_nozzles)
+    # print('Inner Casing Diameter\t', round(diam_inner_casing/.0254, 2))
+    # print('Outer Casing Diameter\t', round(diam_outer_casing/.0254, 2))
+    # print('Inner pass Diameter\t', round(diam_inner_pass/.0254, 2))
+    # print('Outer pass Diameter\t', round(diam_outer_pass/.0254, 2))
+    # print('Dome Height\t\t', round(dome_height/.0254, 2))
+    # print('Combustion Chamber Len\t', round(comb_length/.0254, 2))
+    # print('Combsutor Volume\t', round(comb_vol/(.0254*12)**3, 2))
+    # print('Space Rate\t\t', round(space_rate, 2))
+
+    return np.array((num_nozzles, diam_inner_casing, diam_outer_casing, diam_inner_pass, diam_outer_pass, comb_length, inlet_length, inlet_height, ref_height, dome_height, height_inner_pass, height_outer_pass))
+
+
 def assignment5(dfConfigs, R_gas=287.05):
     Tt0 = convert_temps(dfConfigs['Config 1'].loc['0 Freestream', 'Total Temperature (R)'], 'SI')
     Pt0 = convert_pressures(dfConfigs['Config 1'].loc['0 Freestream', 'Total Pressure (psia)'], 'SI')
@@ -396,70 +462,6 @@ def assignment7():
         
     compressor_vel_diagrams(Tt1, Pt1, massflow1, alpha1, comp_press_ratio, num_stages, Dt1, Dp1, Dp2, area3, spool_speed_rads, stage_eff, loss_coeff_r, loss_coeff_s, reaction, alpha3)
 
-def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, max_dome_vel, comblendomeheight, fuelflow, LHV, length_height, wall_angle, height_turbine_inlet, gamma=1.4, R_gas=287.05):
-    rhot31 = Pt31/R_gas/Tt31
-    ref_area = airflow/rhot31/ref_vel
-    ref_height = ref_area/np.pi/pitch_diam
-    diam_inner_casing = (pitch_diam/2 - ref_height/2)*2
-    diam_outer_casing = (pitch_diam/2 + ref_height/2)*2
-    
-    if diam_inner_casing < min_diam_casing or diam_outer_casing > max_diam_casing:
-        print('---ERROR: CASING DIAMETER EXCEEDS LIMITS---')
-        print('Recommended action: change reference velocity')
-
-    area_passage = flow_split*airflow/rhot31/passage_vel  
-    diam_inner_pass = 2*np.sqrt(diam_inner_casing**2/4 + area_passage/np.pi)
-    diam_outer_pass = 2*np.sqrt(diam_outer_casing**2/4 - area_passage/np.pi)
-    height_inner_pass = (diam_inner_pass - diam_inner_casing)/2
-    height_outer_pass = (diam_outer_casing - diam_outer_pass)/2
-
-    dome_height = ref_height - height_inner_pass - height_outer_pass
-    dome_area = np.pi*dome_height*pitch_diam
-    dome_vel = flow_split*airflow/rhot31/dome_area
-    
-    if dome_vel > max_dome_vel:
-        print('---ERROR: DOME VELOCITY EXCEEDS MAXIMUM---')
-        print('Recommended action: reduce reference velocity')
-        print('Dome Vel: {} \t Max: {}'.format(round(dome_vel, 2), round(max_dome_vel, 2)))
-
-    comb_length = comblendomeheight * dome_height
-    area_entr = ref_height * comb_length/2
-    area_exit = 1/2*(ref_height+height_turbine_inlet)
-    comb_vol = (area_entr+area_exit)*np.pi*pitch_diam*comb_length
-
-    fuel_air = fuelflow/airflow
-    airflow_lb = convert_mass(airflow, 'imp')
-    Ps31_atm = Pt31/101300
-    comb_vol_ft3 = comb_vol/(.0254*12)**3
-    space_rate = 3600*fuel_air*airflow_lb*LHV/Ps31_atm/comb_vol_ft3
-
-    if not 8e6 < space_rate < 10e6:
-        print('---ERROR: SPACE RATE EXCCEEDS LIMITS---')
-        print('Recommended action: change length to height ratio, then dome velocity')
-        print('Dome Vel: {:.3e} \t Bounds: {:.3e},{:.3e}'.format(space_rate, 8e6, 10e6))
-
-    diff_area_ratio = 1+2*length_height*np.tan(wall_angle)
-    inlet_area = ref_area/diff_area_ratio
-    inlet_height = inlet_area/np.pi/pitch_diam
-    inlet_length = inlet_height*length_height
-
-    circumference = np.pi*pitch_diam
-    num_nozzles = np.ceil(circumference/dome_height)
-
-    print(np.array((ref_area, ref_height, area_passage, height_inner_pass, height_outer_pass, dome_height, dome_area))/.0254)
-    print()
-    print(num_nozzles)
-    print('Inner Casing Diameter\t', round(diam_inner_casing/.0254, 2))
-    print('Outer Casing Diameter\t', round(diam_outer_casing/.0254, 2))
-    print('Inner pass Diameter\t', round(diam_inner_pass/.0254, 2))
-    print('Outer pass Diameter\t', round(diam_outer_pass/.0254, 2))
-    print('Dome Height\t\t', round(dome_height/.0254, 2))
-    print('Combustion Chamber Len\t', round(comb_length/.0254, 2))
-    print('Combsutor Volume\t', round(comb_vol/(.0254*12)**3, 2))
-    print('Space Rate\t\t', round(space_rate, 2))
-
-    return np.array((num_nozzles, diam_inner_casing, diam_outer_casing, diam_inner_pass, diam_outer_pass, comb_length, inlet_length, inlet_height, ref_height, dome_height, height_inner_pass, height_outer_pass))
-
 def assignment8():
     # Compressor parameters
     Tt31 = 897.1 # R
@@ -510,6 +512,47 @@ def assignment8():
     print(result[5:7]/.0254)
     print(result[7:]/.0254)
 
+def turbine(Tt1, Tts1, Pt0, Ps1, Pt2, Ps2, turb_eff, tip_diam, hub_diam1, spool_speed, gamma_hot, gamma_cold=1.4, R_gas=287.05):
+    '''Calculations are acrosss one stage of a turbine. The subscripts denote stations across the stage.
+    Station 1 is before the stator, station 2 is between the stator and the rotor, station 3 is after the rotor.
+    c = cz + ctj = axial flow + azimuthal flow.
+    c is absolute velocity.
+    w is realtive to the rotor.'''
+    cp_hot = gamma_hot*R_gas/(gamma_hot-1)
+    pitch_diam1 = (tip_diam + hub_diam1)/2
+    tip_speed = spool_speed1*tip_diam
+    spool_speed1 = spool_speed*pitch_diam1/2
+
+    gammahm = gamma_hot - 1
+    gammahp = gamma_hot + 1
+    gammacm = gamma_cold - 1
+    gammacp = gamma_cold + 1
+    
+    reaction = (Ps1**(gammahm/gamma_hot) - Ps2**(gammahm/gamma_hot))/(Pt0**(gammahm/gamma_hot) - Ps2**(gammahm/gamma_hot))
+    V1a = np.sqrt(turb_eff)*V1i
+    Ts1a = Tt1 - V1a**2/2/cp_hot
+    Pt1 = Ps1*(Tt1/Ts1a)**(gamma_hot/gammahm)
+    Ttr1 = Ts1 + pitch_speed1**2/cp_hot
+    Ptr1 = Ps1*(Ttr1/Ts1)**(gamma_hot/gammahm)
+    
+def assignment9():
+    Tt4 = 2560 # R
+    Pt4 = 50.04 # psia
+    massflow4 = 64.71 # lbm/s
+    N = 11619 # rpm
+    eff_turb = .92 # must stay above .92
+    Tt49 = 2149 # R
+    Pt49 = 232.3 # psia
+    gamma_hot = 4/3
+    work = 112.74
+    mach5 = .55
+    alpha2 = 0 # no exit swirl
+    max_tip_speed = 1650 # ft/sec
+    stator_axwidth = 2 # in
+    rotor_axwidth = 1.5 # in
+    gap_axwidth = .5 # in
+    inlet_tip_diam = 32.55 # in
+    inlet_hub_diam = 25.76 # in
 
 if __name__ == '__main__':
-    assignment8()
+    assignment9()
