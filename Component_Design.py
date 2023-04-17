@@ -99,7 +99,7 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
 
     return np.array([streamtube_diameter, highlight_diameter, throat_diameter, fan_diameter]), diffuser_length, diffuser_length/throat_diameter
 
-def find_area(mach, massflow, densityt, Tt, area, gamma=1.4, R=287.05):
+def find_mach(mach, massflow, densityt, Tt, area, gamma=1.4, R=287.05):
     densitys = isenf.density(mach, densityt)
     Ts = isenf.T(mach, Tt)
     sound_speed = np.sqrt(gamma*R*Ts)
@@ -173,7 +173,7 @@ def compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, tot
     num_stages = np.ceil(num_stages)
     compressor_length = 2*num_stages*avg_blade_width + (2*num_stages-1)*avg_gap # 6 rotors, 6 stators, 11 gaps in between all of the rotors and stators
 
-    mach2 = rootfind.newton2(find_area, .469, massflow=massflow2, densityt=densityt2, Tt=Tt2, area=inlet_flow_area)
+    mach2 = rootfind.newton2(find_mach, .469, massflow=massflow2, densityt=densityt2, Tt=Tt2, area=inlet_flow_area)
     Ts2 = isenf.T(mach2, Tt2)
     Ps2 = isenf.p(mach2, Pt2)
     densitys2 = isenf.density(mach2, densityt2)
@@ -200,7 +200,7 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     flow_area2 = np.pi*Dt1**2/4 - hub_area2
 
     densityt1 = Pt1/R_gas/Tt1
-    mach1 = rootfind.newton2(find_area, .5, massflow=massflow, densityt=densityt1, Tt=Tt1, area=flow_area1)
+    mach1 = rootfind.newton2(find_mach, .5, massflow=massflow, densityt=densityt1, Tt=Tt1, area=flow_area1)
     Ts1 = isenf.T(mach1, Tt1)
     Ps1 = isenf.p(mach1, Pt1)
     densitys1 = isenf.density(mach1, densityt1)
@@ -235,7 +235,7 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     Tt3 = Tt2
     reaction = (np.abs(w1)**2-np.abs(w2)**2)/2/spool_speed2/delta_ct
     densityt3 = Pt3/R_gas/Tt3
-    mach3 = rootfind.newton2(find_area, .5, massflow=massflow, densityt=densityt3, Tt=Tt3, area=flow_area3)
+    mach3 = rootfind.newton2(find_mach, .5, massflow=massflow, densityt=densityt3, Tt=Tt3, area=flow_area3)
     Ts3 = isenf.T(mach3, Tt3)
     Ps3 = isenf.p(mach3, Pt3)
     densitys3 = isenf.density(mach3, densityt3)
@@ -512,31 +512,31 @@ def assignment8():
     print(result[5:7]/.0254)
     print(result[7:]/.0254)
 
-def turbine(Tt1, Tts1, Pt0, Ps1, Pt2, Ps2, turb_eff, tip_diam, hub_diam1, spool_speed, gamma_hot, gamma_cold=1.4, R_gas=287.05):
+def turbine(Tt0, Pt0, work, alpha, massflow, tip_diam, hub_diam, spool_speed, gamma_hot, gamma_cold=1.4, R_gas=287.05):
     '''Calculations are acrosss one stage of a turbine. The subscripts denote stations across the stage.
     Station 1 is before the stator, station 2 is between the stator and the rotor, station 3 is after the rotor.
     c = cz + ctj = axial flow + azimuthal flow.
     c is absolute velocity.
     w is realtive to the rotor.'''
     cp_hot = gamma_hot*R_gas/(gamma_hot-1)
-    pitch_diam1 = (tip_diam + hub_diam1)/2
-    tip_speed = spool_speed1*tip_diam
+
+    pitch_diam1 = (tip_diam + hub_diam)/2
+    tip_speed = spool_speed/2*tip_diam
     spool_speed1 = spool_speed*pitch_diam1/2
 
+    flow_area = np.pi*(tip_diam - hub_diam)**2/4
+    densityt = Pt0/Tt0/R_gas
+    # mach = rootfind.newton2(find_mach, .7, massflow=massflow, densityt=densityt, Tt=Tt0, area=flow_area, gamma=gamma_hot, R=R_gas)
+    # print(mach)
+    print(find_mach(1, massflow, densityt, Tt0, flow_area, gamma=gamma_hot, R=R_gas))
     gammahm = gamma_hot - 1
     gammahp = gamma_hot + 1
     gammacm = gamma_cold - 1
     gammacp = gamma_cold + 1
+
+    u2u1 = work / spool_speed1
     
-    reaction = (Ps1**(gammahm/gamma_hot) - Ps2**(gammahm/gamma_hot))/(Pt0**(gammahm/gamma_hot) - Ps2**(gammahm/gamma_hot))
-    V1a = np.sqrt(turb_eff)*V1i
-    Ts1a = Tt1 - V1a**2/2/cp_hot
-    Pt1 = Ps1*(Tt1/Ts1a)**(gamma_hot/gammahm)
-    Ttr1 = Ts1 + pitch_speed1**2/cp_hot
-    Ptr1 = Ps1*(Ttr1/Ts1)**(gamma_hot/gammahm)
-    
-def assignment9():
-    ters
+def assignment10():
     Tt4 = 2560 # R
     Pt4 = 50.04 # psia
     massflow4 = 64.71 # lbm/s
@@ -546,23 +546,21 @@ def assignment9():
     Pt49 = 232.3 # psia
     gamma_hot = 4/3
     work = 112.74
-    mach5 = .55
+    mach49 = .55
     alpha2 = 0 # no exit swirl
-    max_tip_speed = 1650 # ft/sec
-    stator_axwidth = 2 # in
-    rotor_axwidth = 1.5 # in
-    gap_axwidth = .5 # in
-    inlet_tip_diam = 32.55 # in
-    inlet_hub_diam = 25.76 # in
 
-    inlet_tip_diam *= .0254
-    inlet_hub_diam *= .0254
-    pitch_diam = (inlet_tip_diam + inlet_hub_diam)/2
-    work = convert_work(work, 'SI')
-    psi_max = .65
-    vel_max = np.sqrt(work/psi_max/2)
-    spool_speed = 2*np.pi*N/60
-    vel = spool_speed*pitch_diam/2
-    print(vel_max, vel)
+    tip_diam = 32.55 # in
+    hub_diam = 25.76 # in
+    nozzle_coeff = .983
+    pitch_line_load = .6459
+    Tt4 = convert_temps(Tt4)
+    Pt4 = convert_pressures(Pt4)
+    massflow4 = convert_mass(massflow4)
+    work = convert_work(work)
+    tip_diam = tip_diam *.0254
+    hub_diam = hub_diam *.0254
+
+    turbine(Tt4, Pt4, work, alpha2, massflow4, tip_diam, hub_diam, N, gamma_hot, gamma_cold=1.4, R_gas=287.05)
+
 if __name__ == '__main__':
-    assignment9()
+    assignment10()
