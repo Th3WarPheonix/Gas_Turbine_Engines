@@ -53,7 +53,7 @@ def convert_pressures(pressures, to:str='SI'):
             return np.array(pressures)*con_factor
 
 def convert_work(works, to:str='SI'):
-    """Convert the work from J to Btu"""
+    """Convert the work from J/kg to Btu/lbm"""
     if to == 'imp':
         try:
             works = works / 1055 / 2.205
@@ -554,5 +554,14 @@ def assignment9():
     inlet_tip_diam = 32.55 # in
     inlet_hub_diam = 25.76 # in
 
+    inlet_tip_diam *= .0254
+    inlet_hub_diam *= .0254
+    pitch_diam = (inlet_tip_diam + inlet_hub_diam)/2
+    work = convert_work(work, 'SI')
+    psi_max = .65
+    vel_max = np.sqrt(work/psi_max/2)
+    spool_speed = 2*np.pi*N/60
+    vel = spool_speed*pitch_diam/2
+    print(vel_max, vel)
 if __name__ == '__main__':
     assignment9()
