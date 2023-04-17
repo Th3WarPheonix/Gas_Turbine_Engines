@@ -536,6 +536,7 @@ def turbine(Tt1, Tts1, Pt0, Ps1, Pt2, Ps2, turb_eff, tip_diam, hub_diam1, spool_
     Ptr1 = Ps1*(Ttr1/Ts1)**(gamma_hot/gammahm)
     
 def assignment9():
+    ters
     Tt4 = 2560 # R
     Pt4 = 50.04 # psia
     massflow4 = 64.71 # lbm/s
