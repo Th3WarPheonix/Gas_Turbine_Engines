@@ -100,6 +100,7 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
     return np.array([streamtube_diameter, highlight_diameter, throat_diameter, fan_diameter]), diffuser_length, diffuser_length/throat_diameter
 
 def find_mach(mach, massflow, densityt, Tt, area, gamma=1.4, R=287.05):
+    """Find Mach number from given massflow, total temperature, denmsity, and flow area"""
     densitys = isenf.density(mach, densityt)
     Ts = isenf.T(mach, Tt)
     sound_speed = np.sqrt(gamma*R*Ts)
@@ -523,6 +524,7 @@ def turbine(Tt0, Pt0, work, alpha0, alpha2, massflow, tip_diam, hub_diam, spool_
     gammap = gamma_hot + 1
     gammag = gammam/gamma_hot
     Tt1 = Tt0
+    Pt1 = Pt0
 
     pitch_diam1 = (tip_diam + hub_diam)/2
     tip_speed = spool_speed/2*tip_diam
@@ -538,7 +540,9 @@ def turbine(Tt0, Pt0, work, alpha0, alpha2, massflow, tip_diam, hub_diam, spool_
     reaction = .5
     Ps2 = Ps0*.89
     Ps1 = (reaction*(Pt0**gammag-Ps2**gammag)+Ps2**gammag)**(1/gammag)
-    velocity1i = 0
+    mach1 = isenf.machfromPressRatio(Ps1/Pt1, gamma_hot)
+    Ts1 = isenf.T(mach1, Tt0)
+    velocity1i = np
     velocity1a = np.sqrt(stage_eff)*velocity1i
     Ts1 = Tt1 - velocity1a**2/2/cp_hot
     Pt1 = Ps1*(Tt1/Ts1)**(1/gammag)
