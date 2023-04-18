@@ -512,29 +512,42 @@ def assignment8():
     print(result[5:7]/.0254)
     print(result[7:]/.0254)
 
-def turbine(Tt0, Pt0, work, alpha, massflow, tip_diam, hub_diam, spool_speed, gamma_hot, gamma_cold=1.4, R_gas=287.05):
+def turbine(Tt0, Pt0, work, alpha0, alpha2, massflow, tip_diam, hub_diam, spool_speed, stage_eff, gamma_hot, gamma_cold=1.4, R_gas=287.05):
     '''Calculations are acrosss one stage of a turbine. The subscripts denote stations across the stage.
     Station 1 is before the stator, station 2 is between the stator and the rotor, station 3 is after the rotor.
     c = cz + ctj = axial flow + azimuthal flow.
     c is absolute velocity.
     w is realtive to the rotor.'''
     cp_hot = gamma_hot*R_gas/(gamma_hot-1)
+    gammam = gamma_hot - 1
+    gammap = gamma_hot + 1
+    gammag = gammam/gamma_hot
+    Tt1 = Tt0
 
     pitch_diam1 = (tip_diam + hub_diam)/2
     tip_speed = spool_speed/2*tip_diam
     spool_speed1 = spool_speed*pitch_diam1/2
 
-    flow_area = np.pi*(tip_diam - hub_diam)**2/4
-    densityt = Pt0/Tt0/R_gas
-    # mach = rootfind.newton2(find_mach, .7, massflow=massflow, densityt=densityt, Tt=Tt0, area=flow_area, gamma=gamma_hot, R=R_gas)
-    # print(mach)
-    print(find_mach(1, massflow, densityt, Tt0, flow_area, gamma=gamma_hot, R=R_gas))
-    gammahm = gamma_hot - 1
-    gammahp = gamma_hot + 1
-    gammacm = gamma_cold - 1
-    gammacp = gamma_cold + 1
+    flow_area = np.pi*(tip_diam**2- hub_diam**2)/4
+    densityt0 = Pt0/Tt0/R_gas
+    mach0 = rootfind.newton2(find_mach, .7, massflow=massflow, densityt=densityt0, Tt=Tt0, area=flow_area, gamma=gamma_hot, R=R_gas)
+    Ps0 = isenf.p(mach0, Pt0)
+    Ts0 = isenf.T(mach0, Tt0)
+    velocity0 = mach0*np.sqrt(gamma_hot*R_gas*Ts0)
 
-    u2u1 = work / spool_speed1
+    reaction = .5
+    Ps2 = Ps0*.89
+    Ps1 = (reaction*(Pt0**gammag-Ps2**gammag)+Ps2**gammag)**(1/gammag)
+    velocity1i = 0
+    velocity1a = np.sqrt(stage_eff)*velocity1i
+    Ts1 = Tt1 - velocity1a**2/2/cp_hot
+    Pt1 = Ps1*(Tt1/Ts1)**(1/gammag)
+    u2 = work / spool_speed1 + velocity1a # u2 - u1
+    alpha1 = np.arccos(massflow/densitys1*velocity1a*flow_area)
+    Ttr1 = Ts1 + R1**2/2/cp_hot
+    Ptr1 = Ps1*(Ttr1/Ts1)**(1/gammag)
+    Tt2 = Tt0 - work/cp_hot/stage_eff
+    print(Tt2, Tt0, cp_hot, work, massflow)
     
 def assignment10():
     Tt4 = 2560 # R
@@ -547,6 +560,7 @@ def assignment10():
     gamma_hot = 4/3
     work = 112.74
     mach49 = .55
+    alpha0 = 0
     alpha2 = 0 # no exit swirl
 
     tip_diam = 32.55 # in
@@ -560,7 +574,7 @@ def assignment10():
     tip_diam = tip_diam *.0254
     hub_diam = hub_diam *.0254
 
-    turbine(Tt4, Pt4, work, alpha2, massflow4, tip_diam, hub_diam, N, gamma_hot, gamma_cold=1.4, R_gas=287.05)
+    turbine(Tt4, Pt4, work, alpha0, alpha2, massflow4, tip_diam, hub_diam, N, eff_turb, gamma_hot, gamma_cold=1.4, R_gas=287.05)
 
 if __name__ == '__main__':
     assignment10()
