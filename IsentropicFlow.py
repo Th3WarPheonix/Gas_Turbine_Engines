@@ -45,3 +45,11 @@ def densRatio(M, gamma=1.4):
     """Returns stagnation density ratio, rho1/rho0"""
     rho0rho1 = (1 + (gamma-1)/2.0*M**2.0)**(1.0/(gamma-1))
     return rho0rho1**-1
+
+def machfromPressRatio(ratio, gamma=1.4):
+    """Ratio is given as static pressure/total pressure"""
+    return ((ratio**(-(gamma-1)/gamma)-1)*2/(gamma-1))**0.5
+
+def machfromdensRatio(ratio, gamma=1.4):
+    """Returns stagnation density ratio, rho1/rho0"""
+    return ((ratio**(-(gamma-1)/1)-1)*2/(gamma-1))**0.5
