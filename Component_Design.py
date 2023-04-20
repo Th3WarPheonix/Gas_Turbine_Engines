@@ -4,68 +4,84 @@ import IsentropicFlow as isenf
 import RootFinding as rootfind
 import matplotlib.pyplot as plt
 
-def convert_temps(temps, to:str='SI'):
-    """Convert the temperature from K to R"""
+def convert_temps(temps, to:str='K'):
+    """Convert temperature between Kelvin and Rankine
+    to = 'K' for converting to Kelvin
+    to = 'R' for converting to Rankine"""
     con_factor = 1.8
-    if to == 'imp':
+    if to == 'R':
         try:
             temps *= con_factor
             return temps
         except:
             return np.array(temps)*con_factor
-    elif to == 'SI':
+    elif to == 'K':
         try:
             temps = temps/con_factor
             return temps
         except:
             return np.array(temps)/con_factor
+    else:
+        print('Did not convert temperatures')
 
-def convert_mass(mass, to:str='SI'):
-    """Convert the temperature from lbm to kg"""
+def convert_mass(mass, to:str='lbm'):
+    """Convert mass between lbm and kg
+    to = 'lbm' for converting to lbm
+    to = 'kg' for converting to kg"""
     con_factor = 2.20462
-    if to == 'imp':
+    if to == 'lbm':
         try:
             mass *= con_factor
             return mass
         except:
             return np.array(mass)*con_factor
-    elif to == 'SI':
+    elif to == 'kg':
         try:
             mass = mass/con_factor
             return mass
         except:
             return np.array(mass)/con_factor
+    else:
+        print('Did not convert masses')
 
-def convert_pressures(pressures, to:str='SI'):
-    """Convert the pressure from Pa to psia"""
+def convert_pressures(pressures, to:str='Pa'):
+    """Convert pressure between Pascals and PSI
+    to = 'Pa' for converting to Pascals
+    to = 'psi' for converting to PSI"""
     con_factor = 6895.0
-    if to == 'imp':
+    if to == 'psi':
         try:
             pressures = pressures/con_factor
             return pressures
         except:
             return np.array(pressures)/con_factor
-    elif to == 'SI':
+    elif to == 'Pa':
         try:
             pressures = pressures*con_factor
             return pressures
         except:
             return np.array(pressures)*con_factor
+    else:
+        print('Did not convert pressures')
 
-def convert_work(works, to:str='SI'):
-    """Convert the work from J/kg to Btu/lbm"""
-    if to == 'imp':
+def convert_energy(works, to:str='SI'):
+    """Convert mass specific energy/work between Btu/lbm and J/kg
+    to = 'J' for converting to J/kg
+    to = 'BTU' for converting to BTU/lbm"""
+    if to == 'BTU':
         try:
             works = works / 1055 / 2.205
             return works
         except:
             return np.array(works) / 1055 / 2.205
-    elif to == 'SI':
+    elif to == 'J':
         try:
             works = works * 1055 * 2.205
             return works
         except:
             return np.array(works) * 1055 * 2.205
+    else:
+        print('Did not convert temperatures')
         
 def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0AHL:float, mach_throat:float, Tt0:float, Pt0:float, Ts1:float, Ps1:float, mach_fan:float, diffuser_angle:float, gamma:float=1.4, R_gas:float=287.05):
     '''Entrance calcs'''
@@ -272,7 +288,7 @@ def compressor_vel_diagrams(Tt1, Pt1, massflow, alpha1, press_ratio, num_stages,
     print('Tt2 R', convert_temps(Tt2, 'imp'))
     print('Ps2 psia', convert_pressures(Ps2, 'imp'))
     print('Ts2 R', convert_temps(Ts2, 'imp'))
-    print('Stage work btu/lbm', convert_work(work_stage, 'imp'))
+    print('Stage work btu/lbm', convert_energy(work_stage, 'imp'))
     print()
     print('Pt3 psia', convert_pressures(Pt3, 'imp'))
     print('Tt3 R', convert_temps(Tt3, 'imp'))
@@ -419,7 +435,7 @@ def assignment6():
     massflow31 = massflow31/2.205
     max_tip_diam *= .0254 # m
     max_tip_speed *= 12*.0254 # m/s
-    total_work = convert_work(total_work, 'SI') # J/(kg/s)
+    total_work = convert_energy(total_work, 'SI') # J/(kg/s)
 
     return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
 
@@ -610,7 +626,7 @@ def assignment10():
     Ps0 = convert_pressures(Ps0)
     Pt49 = convert_pressures(Pt49)
     massflow4 = convert_mass(massflow4)
-    work = convert_work(work)
+    work = convert_energy(work)
     tip_diam = tip_diam *.0254
     hub_diam = hub_diam *.0254
     N *= 2*np.pi/60
