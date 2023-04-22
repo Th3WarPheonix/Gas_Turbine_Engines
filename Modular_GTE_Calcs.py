@@ -69,8 +69,8 @@ def convert_work(works, to:str):
             return np.array(works) * 1055 * 2.205
 
 def ambient_properties(mach:float, static_temperature0:float, static_pressure0:float, gamma:float=1.4, R_gas=287.05):
-    total_temperature0 = isenf.T0(mach, static_temperature0, gamma)
-    total_pressure0    = isenf.p0(mach, static_pressure0, gamma)
+    total_temperature0 = isenf.total_temperature(mach, static_temperature0, gamma)
+    total_pressure0    = isenf.total_pressure(mach, static_pressure0, gamma)
     static_density0 = static_pressure0/R_gas/static_temperature0
     total_density0 = total_pressure0/R_gas/total_temperature0
     return total_temperature0, total_pressure0, static_density0, total_density0
@@ -79,8 +79,8 @@ def inlet(mach1:float, total_temperature0:float, total_pressure0:float, Ipr:floa
     """Station 1 - Fan Face"""
     total_pressure1     = Ipr*total_pressure0
     total_temperature1  = total_temperature0
-    static_temperature1 = isenf.T(mach1, total_temperature1, gamma)
-    static_pressure1    = isenf.p(mach1, total_pressure1, gamma)
+    static_temperature1 = isenf.static_temperature(mach1, total_temperature1, gamma)
+    static_pressure1    = isenf.static_pressure(mach1, total_pressure1, gamma)
     static_density1 = static_pressure1/R_gas/static_temperature1
     total_density1  = total_pressure1/R_gas/total_temperature1
     velocity = mach1*np.sqrt(gamma*R_gas*static_temperature1)
@@ -244,7 +244,7 @@ def engine_configurations(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan
         stations, dfResult  = engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio[i], comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust[i], gamma_hot)
         dfConfigi = pd.DataFrame(pd.concat(stations), columns=['{}_{}_{}'.format(comp_press_ratio[i], int(convert_temps(Tt4[i], 'imp')-460), bypass_ratio[i])])
         dfConfigs = pd.concat([dfConfigs, dfConfigi], axis=1)
-        # dfResult.to_csv('Result_Config_{}_{}_{}.csv'.format(comp_press_ratio[i], int(convert_temps(Tt4[i], 'imp')-460), bypass_ratio[i]))
+        dfResult.to_csv('Result_Config_{}_{}_{}.csv'.format(comp_press_ratio[i], int(convert_temps(Tt4[i], 'imp')-460), bypass_ratio[i]))
     dfConfigs.index = dfConfigs.index.rename(['Station','Property'])
     dfConfigs.to_csv('Engine Configurations.csv')
     return dfConfigs
@@ -370,7 +370,7 @@ def rfp2():
 
     dfConfigs = engine_configurations(Ts0, Ps0, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass, comp_eff, comp_press_ratio, massflow31, LHV, Tt4, comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust, gamma_hot)
     print(dfConfigs)
-    engine_config_plots(dfConfigs, comp_press_ratio, max_Tt3, max_Tt495, fuel_vol, max_diam)
+    # engine_config_plots(dfConfigs, comp_press_ratio, max_Tt3, max_Tt495, fuel_vol, max_diam)
 
     Scaledturbofan = dfConfigs.loc['0 Freestream', 'Total Temperature (R)']
 
