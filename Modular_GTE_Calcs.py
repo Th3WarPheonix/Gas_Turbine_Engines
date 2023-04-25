@@ -72,7 +72,7 @@ def ambient_properties(mach:float, static_temperature0:float, static_pressure0:f
     total_temperature0 = isenf.total_temperature(mach, static_temperature0, gamma)
     total_pressure0    = isenf.total_pressure(mach, static_pressure0, gamma)
     static_density0 = static_pressure0/R_gas/static_temperature0
-    total_density0 = total_pressure0/R_gas/total_temperature0
+    total_density0  = total_pressure0/R_gas/total_temperature0
     return total_temperature0, total_pressure0, static_density0, total_density0
 
 def inlet(mach1:float, total_temperature0:float, total_pressure0:float, Ipr:float, gamma:float=1.4, R_gas:float=287.05):
@@ -119,13 +119,11 @@ def turbine(Tt4, Pt4, Tt31, massflow31, comp_work, fan_work, coolflow, turb_comp
     cp_cold = gamma*R_gas/(gamma-1)
     cp_hot = gamma_hot*R_gas/(gamma_hot-1)
 
-    massflow5 = massflow31 + coolflow
-
     Tt49  = Tt4 - comp_work/(massflow31*cp_hot)
     Pt49 = Pt4*(Tt49/Tt4)**(gamma_hot/(gamma_hot-1))*turb_comp_eff
 
+    massflow5 = massflow31 + coolflow
     Tt495 = (massflow31*cp_hot*Tt49 + coolflow*cp_cold*Tt31)/(massflow5*cp_hot)
-
     Tt5 = Tt495 - fan_work/(massflow5*cp_hot)
     Pt5 = Pt49*(Tt5/Tt495)**(gamma_hot/(gamma_hot-1))*turb_fan_eff
 
@@ -139,7 +137,7 @@ def nozzle(Tt5, Pt5, Ps9, Cv, gamma_hot=4/3, gamma=1.4 , R_gas=287.05):
     vel9i = np.sqrt(2*cp_hot*(Tt5 - Ts9i))
     vel9a = Cv*vel9i
     Ts9a = Tt5 - (vel9a**2)/2/cp_hot
-    Pt9 = (Tt5/Ts9i)**(gamma_hot/(gamma_hot-1))*Ps9
+    Pt9 = (Tt5/Ts9a)**(gamma_hot/(gamma_hot-1))*Ps9
 
     return (Ts9i, Ts9a, Pt9, vel9a)
 
@@ -160,11 +158,12 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
         Tt1, Pt1, Ts1, Ps1, Vel1, rhos1, rhot1  = inlet(mach1, Tt0, Pt0, inlet_press_rec)
         Tt3i, Tt3a, Pt3, Wci, Wca = compressor(Tt1, Pt1, comp_eff, comp_press_ratio, 0)
         fuel_air_ratio, Pt4       = combustor(Tt3a, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot)
-        Tt49, Tt5, Pt49, Pt5, massflow5, Tt495 = turbine(Tt4, Pt4, Tt3a, m31+fuel_air_ratio, Wca, 0, turbine_cool_flow, core_turb_eff, fan_turb_eff, gamma_hot)
+        Tt49, Tt5, Pt49, Pt5, massflow5, Tt495 = turbine(Tt4, Pt4, Tt3a, m31+fuel_air_ratio, Wca, 0, turbine_cool_flow, core_turb_eff, 1, gamma_hot)
         Ts9i, Ts9a, Pt9, Vel9     = nozzle(Tt5, Pt5, Pambient, vel_coeff_core) # Core
         Vel19, Tt13i, Tt13a, Wfi, Wfa, Ts19i, Ts19a, Pt13, Pt19 = 0,0,0,0,0,0,0,0,0 # Fan specific variables
         Tt2 = Tt1
         Pt2 = Pt1
+        print(Pt9, Pt5)
 
     # Calculate the mass flow of air into the compressor based on thrust required
     Vel0 = mach0*np.sqrt(gamma*R_gas*Tambient)
@@ -188,6 +187,7 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     Ts0_emp, Tt0_emp, Tt1_emp, Ts1_emp, Tt2_emp, Tt13i_emp, Tt13a_emp, Tt3i_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt495_emp, Tt5_emp, Ts9i_emp, Ts9a_emp, Ts19i_emp, Ts19a_emp = temperautres_emps
     pressures_emps = convert_pressures([Pambient, Pt0, Pt1, Ps1, Pt2, Pt13, Pt3, Pt4, Pt49, Pt5, Pambient, Pt9, Pt19], 'imp')
     Ps0_emp, Pt0_emp, Pt1_emp, Ps1_emp, Pt2_emp, Pt13_emp, Pt3_emp, Pt4_emp, Pt49_emp, Pt5_emp, Ps9_emp, Pt9_emp, Pt19_emp = pressures_emps
+    print(Pt9_emp, Pt5_emp)
     Vel1_emp = Vel1 / 12 / .0254
     Vel9_emp = Vel9 / 12 / .0254
     Vel19_emp = Vel19 / 12 / .0254
@@ -229,7 +229,7 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     
     # Pt0_emp, (1+bypass_ratio)*massflow2_emp
     total_temps = (Tt0_emp, Tt1_emp, Tt2_emp, Tt3a_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt495_emp, Tt5_emp, Tt5_emp, Tt13a_emp, Tt13a_emp)
-    total_press = (Pt0_emp, Pt1_emp, Pt2_emp, Pt3_emp, Pt3_emp, Pt4_emp, Pt49_emp, Pt49_emp, Pt5_emp, Pt5_emp, Pt13_emp, Pt13_emp)
+    total_press = (Pt0_emp, Pt1_emp, Pt2_emp, Pt3_emp, Pt3_emp, Pt4_emp, Pt49_emp, Pt49_emp, Pt5_emp, Pt9_emp, Pt13_emp, Pt19_emp)
     total_mass = ((1+bypass_ratio)*massflow2_emp, (1+bypass_ratio)*massflow2_emp, massflow2_emp, massflow2_emp, massflow2_emp*m31, massflow2_emp*m31, massflow2_emp*m31, massflow2_emp*massflow5, massflow2_emp*massflow5, massflow2_emp*massflow5, bypass_ratio*massflow2_emp, bypass_ratio*massflow2_emp)
     config_temps = pd.Series(total_temps, index=[np.array([0, 1, 2, 3, 3.1, 4, 4.9, 4.95, 5, 9, 13, 19], dtype=str)], name='Temperature (R)')
     config_press = pd.Series(total_press, index=[np.array([0, 1, 2, 3, 3.1, 4, 4.9, 4.95, 5, 9, 13, 19], dtype=str)], name='Pressure (psia)')
@@ -321,7 +321,7 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
 def rfp2():
     # General values
     alt = 30000 # ft
-    thrust = [4800, 4800, 4800, 4800, 4800, 4800] # lbf
+    thrust = [4800] #[4800, 4800, 4800, 4800, 4800, 4800] # lbf
     spec_trust = 98.4 # lbf/lbmass flow through compressor
     fuel_vol = 1600 # gallons
     # Ambient values
@@ -332,12 +332,12 @@ def rfp2():
     inlet_press_rec = .99
     # Fan values
     mach1 = .4
-    bypass = [2, 0, 0, 0, 0, 0]
+    bypass = [0] #[2, 0, 0, 0, 0, 0]
     fan_press_ratio = 1.6 # pt13/pt1
     inlet_diam = 51.6 # in
     fan_eff = .88
     # Compressor values
-    comp_press_ratio = [7, 7, 9, 7, 9, 8.49] # pt3/pt2
+    comp_press_ratio = [8]#[7, 7, 9, 7, 9, 8] # pt3/pt2
     massflow2 = 71.2 # lbm
     comp_eff = .87
     comp_leak_flow = .01
@@ -348,7 +348,7 @@ def rfp2():
     comb_press_drop = .95 # Pt4/Pt3
     comb_eff = .995 # actual heat/ ideal heat
     LHV = 18550 # BTU/lbmfuel
-    turbine_inlet_temp = [2100, 2100, 2200, 2200, 2100, 2125] # F
+    turbine_inlet_temp = [2100] #[2100, 2100, 2200, 2200, 2100, 2100] # F
     comb_eff = .995
     gamma_hot = 4/3
     # Turbine values
