@@ -331,7 +331,7 @@ def rfp2():
     # Inlet values
     inlet_press_rec = .99
     # Fan values
-    mach1 = .4
+    mach1 = .5
     bypass = [0] #[2, 0, 0, 0, 0, 0]
     fan_press_ratio = 1.6 # pt13/pt1
     inlet_diam = 51.6 # in

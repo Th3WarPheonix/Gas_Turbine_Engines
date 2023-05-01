@@ -24,7 +24,7 @@ def convert_temps(temps, to:str='K'):
     else:
         print('Did not convert temperatures')
 
-def convert_mass(mass, to:str='lbm'):
+def convert_mass(mass, to:str='kg'):
     """Convert mass between lbm and kg
     to = 'lbm' for converting to lbm
     to = 'kg' for converting to kg"""
@@ -64,7 +64,7 @@ def convert_pressures(pressures, to:str='Pa'):
     else:
         print('Did not convert pressures')
 
-def convert_energy(works, to:str='SI'):
+def convert_energy(works, to:str='J'):
     """Convert mass specific energy/work between Btu/lbm and J/kg
     to = 'J' for converting to J/kg
     to = 'BTU' for converting to BTU/lbm"""
@@ -81,7 +81,7 @@ def convert_energy(works, to:str='SI'):
         except:
             return np.array(works) * 1055 * 2.205
     else:
-        print('Did not convert temperatures')
+        print('Did not convert energy')
         
 def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0AHL:float, mach_throat:float, Tt0:float, Pt0:float, Ts1:float, Ps1:float, mach_fan:float, diffuser_angle:float, gamma:float=1.4, R_gas:float=287.05):
     '''Entrance calcs'''
@@ -117,15 +117,15 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
 
 def find_mach(mach, massflow, densityt, Tt, area, gamma=1.4, R=287.05):
     """Find Mach number from given massflow, total temperature, density, and flow area"""
-    densitys = isenf.density(mach, densityt, gamma=gamma)
-    Ts = isenf.T(mach, Tt, gamma=gamma)
+    densitys = isenf.static_density(mach, densityt, gamma=gamma)
+    Ts = isenf.static_temperature(mach, Tt, gamma=gamma)
     sound_speed = np.sqrt(gamma*R*Ts)
     return (massflow/densitys/mach/sound_speed - area,)
 
 def find_mach2(mach, massflow, densityt, Tt, flow_area, velocity_comp, gamma=1.4, R_gas=287.05):
     """Find Mach number from given massflow, total temperature, density, and flow area and a given velocity component"""
-    Ts1 = isenf.T(mach, Tt, gamma=gamma)
-    densitys1 = isenf.density(mach, densityt, gamma=gamma)
+    Ts1 = isenf.static_temperature(mach, Tt, gamma=gamma)
+    densitys1 = isenf.static_density(mach, densityt, gamma=gamma)
     velocity1zsq = (mach*np.sqrt(gamma*R_gas*Ts1))**2 - velocity_comp**2
     veclocity1zsq2 = (massflow/densitys1/flow_area)**2
     return (veclocity1zsq2 - velocity1zsq, np.sqrt(velocity1zsq))
@@ -369,7 +369,7 @@ def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel,
     comb_vol = (area_entr+area_exit)*np.pi*pitch_diam*comb_length
 
     fuel_air = fuelflow/airflow
-    airflow_lb = convert_mass(airflow, 'imp')
+    airflow_lb = convert_mass(airflow, 'lbm')
     Ps31_atm = Pt31/101300
     comb_vol_ft3 = comb_vol/(.0254*12)**3
     space_rate = 3600*fuel_air*airflow_lb*LHV/Ps31_atm/comb_vol_ft3
@@ -514,13 +514,8 @@ def assignment8():
 
     result = combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, dome_vel_max, comblendomeheight, fuelflow, LHV, lengthheight, wall_angle, height_turbine_inlet)
     print(result[0])
-    print(result[1:3]/.0254/4)
-    print(result[3:5]/.0254/4)
-    print(result[5:7]/.0254/4)
-    print(result[7:]/.0254/4)
-
-    print(result[1:3]/.0254/2)
-    print(result[3:5]/.0254/2)
+    print(result[1:3]/.0254)
+    print(result[3:5]/.0254)
     print(result[5:7]/.0254)
     print(result[7:]/.0254)
 
@@ -532,7 +527,7 @@ def SonicAreaRatio(M, gamma=1.4):
     return AstarA
 
 def find_mach3(mach, Tt, velocity, gamma, R_gas):
-    mach1 = velocity/np.sqrt(gamma*R_gas*isenf.T(mach, Tt))
+    mach1 = velocity/np.sqrt(gamma*R_gas*isenf.static_temperature(mach, Tt))
     return (mach1 - mach,)
 
 def turbine_vel_diagrams(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, massflow, tip_diam, hub_diam, spool_speed, stage_eff, gamma_hot, gamma_cold=1.4, R_gas=287.05):
@@ -552,18 +547,19 @@ def turbine_vel_diagrams(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, mass
     flow_area = np.pi*(tip_diam**2 - hub_diam**2)/4
     densityt0 = Pt0/Tt0/R_gas
     mach0 = rootfind.newton2(find_mach, .3, massflow=massflow, densityt=densityt0, Tt=Tt0, area=flow_area, gamma=gamma_hot, R=R_gas)
-    Ps0 = isenf.p(mach0, Pt0, gamma=gamma_hot)
-    Ts0 = isenf.T(mach0, Tt0, gamma=gamma_hot)
+    print(mach0)
+    Ps0 = isenf.static_pressure(mach0, Pt0, gamma=gamma_hot)
+    Ts0 = isenf.static_temperature(mach0, Tt0, gamma=gamma_hot)
     velocity0 = mach0*np.sqrt(gamma_hot*R_gas*Ts0)
-    Ps2 = isenf.p(mach2a, Pt2, gamma=gamma_hot)
+    Ps2 = isenf.static_pressure(mach2a, Pt2, gamma=gamma_hot)
 
     # After stator
     velocity1u = work/spool_speed1
     mach1 = rootfind.newton2(find_mach2, .9, massflow=massflow, densityt=densityt0, Tt=Tt0, flow_area=flow_area, velocity_comp=velocity1u, gamma=gamma_hot, R_gas=R_gas)
     unused, velocity1z = find_mach2(mach1, massflow, densityt0, Tt0, flow_area, velocity1u, gamma=gamma_hot, R_gas=R_gas)
     alpha1 = np.arctan(velocity1u/velocity1z)
-    Ps1 = isenf.p(mach1, Pt0)
-    Ts1 = isenf.T(mach1, Tt0)
+    Ps1 = isenf.static_pressure(mach1, Pt0)
+    Ts1 = isenf.static_temperature(mach1, Tt0)
     # Before rotor
     reaction = (Ps1**gammag - Ps2**gammag)/(Pt0**gammag - Ps2**gammag)
     relvel1u = velocity1u - spool_speed1
@@ -573,8 +569,8 @@ def turbine_vel_diagrams(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, mass
     Ptr1 = Ps1*(Ttr1/Ts1)**(1/gammag)
     # After rotor
     Ttr2 = Ttr1
-    machr2 = isenf.machfromPressRatio(Ps2/Ptr1, gamma=gamma_hot)
-    Ts2i = isenf.T(machr2, Ttr2, gamma=gamma_hot)
+    machr2 = isenf.temperature_ratio2mach(Ps2/Ptr1, gamma=gamma_hot)
+    Ts2i = isenf.static_temperature(machr2, Ttr2, gamma=gamma_hot)
     relvel2i = machr2*np.sqrt(gamma_hot*R_gas*Ts2i)
     relvel2a = np.sqrt(stage_eff)*relvel2i
     Ts2a = Ttr2 - relvel2a**2/2/cp_hot
@@ -585,16 +581,16 @@ def turbine_vel_diagrams(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, mass
     velocity2u = relvel2u + spool_speed1
     alpha2 = np.tan(velocity2u/velocity2z)
     mach2 = np.sqrt(velocity2u*2+velocity2z**2)/np.sqrt(gamma_hot*R_gas*Ts2a)
-    Pt2 = isenf.p0(mach2, Ps2, gamma=gamma_hot)
-    Tt2 = isenf.T0(mach2, Ts2a, gamma=gamma_hot)
+    Pt2 = isenf.total_pressure(mach2, Ps2, gamma=gamma_hot)
+    Tt2 = isenf.total_temperature(mach2, Ts2a, gamma=gamma_hot)
     print(work, spool_speed1*(velocity1u-velocity2u))
     
     AstarA = SonicAreaRatio(mach2, gamma=gamma_hot)
     Astar = flow_area*AstarA
 
     PsPt_exit = Pambient/Pt2
-    mach_exit = isenf.machfromPressRatio(PsPt_exit, gamma_hot)
-    velocity_exit = mach_exit*np.sqrt(gamma_hot*R_gas*isenf.T(mach_exit, Tt2))
+    mach_exit = isenf.pressure_ratio2mach(PsPt_exit, gamma_hot)
+    velocity_exit = mach_exit*np.sqrt(gamma_hot*R_gas*isenf.total_temperature(mach_exit, Tt2))
     velocity_exit = Cv*velocity_exit
     mach_exit = rootfind.newton2(find_mach3, mach_exit, Tt=Tt2, velocity=velocity_exit, gamma=gamma_hot, R_gas=R_gas)
     AstarAexit = SonicAreaRatio(mach_exit, gamma_hot)
