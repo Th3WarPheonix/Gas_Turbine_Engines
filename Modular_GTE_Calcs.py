@@ -148,7 +148,8 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
         Tt13i, Tt13a, Pt13, Wfi, Wfa = compressor(Tt1, Pt1, fan_eff, fan_press_ratio, bypass_ratio) # Fan
         Tt3i, Tt3a, Pt3, Wci, Wca = compressor(Tt13a, Pt13, comp_eff, comp_press_ratio, 0)
         fuel_air_ratio, Pt4       = combustor(Tt3a, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot)
-        Tt49, Tt5, Pt49, Pt5, massflow5, Tt495 = turbine(Tt4, Pt4, Tt3a, m31+fuel_air_ratio, Wca, Wfa, turbine_cool_flow, core_turb_eff, fan_turb_eff, gamma_hot)
+        massflow4 = m31+fuel_air_ratio
+        Tt49, Tt5, Pt49, Pt5, massflow5, Tt495 = turbine(Tt4, Pt4, Tt3a, massflow4, Wca, Wfa, turbine_cool_flow, core_turb_eff, fan_turb_eff, gamma_hot)
         Ts9i, Ts9a, Pt9, Vel9     = nozzle(Tt5, Pt5, Pambient, vel_coeff_core) # Core
         Ts19i, Ts19a, Pt19, Vel19 = nozzle(Tt13a, Pt13, Pambient, vel_coeff_fan) # Fan
         Tt2 = Tt13a
@@ -158,7 +159,8 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
         Tt1, Pt1, Ts1, Ps1, Vel1, rhos1, rhot1  = inlet(mach1, Tt0, Pt0, inlet_press_rec)
         Tt3i, Tt3a, Pt3, Wci, Wca = compressor(Tt1, Pt1, comp_eff, comp_press_ratio, 0)
         fuel_air_ratio, Pt4       = combustor(Tt3a, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot)
-        Tt49, Tt5, Pt49, Pt5, massflow5, Tt495 = turbine(Tt4, Pt4, Tt3a, m31+fuel_air_ratio, Wca, 0, turbine_cool_flow, core_turb_eff, 1, gamma_hot)
+        massflow4 = m31+fuel_air_ratio
+        Tt49, Tt5, Pt49, Pt5, massflow5, Tt495 = turbine(Tt4, Pt4, Tt3a, massflow4, Wca, 0, turbine_cool_flow, core_turb_eff, 1, gamma_hot)
         Ts9i, Ts9a, Pt9, Vel9     = nozzle(Tt5, Pt5, Pambient, vel_coeff_core) # Core
         Vel19, Tt13i, Tt13a, Wfi, Wfa, Ts19i, Ts19a, Pt13, Pt19 = 0,0,0,0,0,0,0,0,0 # Fan specific variables
         Tt2 = Tt1
@@ -167,7 +169,6 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     # Calculate the mass flow of air into the compressor based on thrust required
     Vel0 = mach0*np.sqrt(gamma*R_gas*Tambient)
     momentum = massflow5*Vel9 + bypass_ratio*Vel19 - (1+bypass_ratio)*Vel0 # (m/s)/s
-    # momentum = massflow5*2762*.0254*12 + bypass_ratio*1184*12*.0254 - (1+bypass_ratio)*Vel0 # (m/s)/s
     massflow2 = thrust*4.4/momentum # kg
     # Calculate the fuel burned base on massflow required
     fuel_density_emp = 6.532 # lbm/gal
@@ -368,10 +369,9 @@ def rfp2():
     LHV = convert_work(LHV, 'SI')
 
     dfConfigs = engine_configurations(Ts0, Ps0, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass, comp_eff, comp_press_ratio, massflow31, LHV, Tt4, comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust, gamma_hot)
-    print(dfConfigs)
     # engine_config_plots(dfConfigs, comp_press_ratio, max_Tt3, max_Tt495, fuel_vol, max_diam)
 
-    Scaledturbofan = dfConfigs.loc['0 Freestream', 'Total Temperature (R)']
+    print(dfConfigs)
 
 if __name__ == '__main__':
     rfp2()
