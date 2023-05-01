@@ -163,7 +163,6 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
         Vel19, Tt13i, Tt13a, Wfi, Wfa, Ts19i, Ts19a, Pt13, Pt19 = 0,0,0,0,0,0,0,0,0 # Fan specific variables
         Tt2 = Tt1
         Pt2 = Pt1
-        print(Pt9, Pt5)
 
     # Calculate the mass flow of air into the compressor based on thrust required
     Vel0 = mach0*np.sqrt(gamma*R_gas*Tambient)
@@ -187,7 +186,7 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     Ts0_emp, Tt0_emp, Tt1_emp, Ts1_emp, Tt2_emp, Tt13i_emp, Tt13a_emp, Tt3i_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt495_emp, Tt5_emp, Ts9i_emp, Ts9a_emp, Ts19i_emp, Ts19a_emp = temperautres_emps
     pressures_emps = convert_pressures([Pambient, Pt0, Pt1, Ps1, Pt2, Pt13, Pt3, Pt4, Pt49, Pt5, Pambient, Pt9, Pt19], 'imp')
     Ps0_emp, Pt0_emp, Pt1_emp, Ps1_emp, Pt2_emp, Pt13_emp, Pt3_emp, Pt4_emp, Pt49_emp, Pt5_emp, Ps9_emp, Pt9_emp, Pt19_emp = pressures_emps
-    print(Pt9_emp, Pt5_emp)
+
     Vel1_emp = Vel1 / 12 / .0254
     Vel9_emp = Vel9 / 12 / .0254
     Vel19_emp = Vel19 / 12 / .0254
