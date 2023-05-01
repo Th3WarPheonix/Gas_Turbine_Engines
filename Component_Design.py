@@ -130,15 +130,27 @@ def find_mach2(mach, massflow, densityt, Tt, flow_area, velocity_comp, gamma=1.4
     veclocity1zsq2 = (massflow/densitys1/flow_area)**2
     return (veclocity1zsq2 - velocity1zsq, np.sqrt(velocity1zsq))
 
-def find_c2z(c2z, w2t, Ptr2, Ttr2, massflow, flow_area2, gamma=1.4, R_gas=287.05):
-    cp_air = gamma*R_gas/(gamma-1)
+def find_mach3(mach, Tt, velocity, gamma, R_gas):
+    """Find mach number from given total temperature and velocity"""
+    mach1 = velocity/np.sqrt(gamma*R_gas*isenf.static_temperature(mach, Tt))
+    return (mach1 - mach,)
+
+def find_c2z(c2z, w2t, Ptr2, Ttr2, massflow, flow_area2, gamma_cold=1.4, R_gas=287.05):
+    cp_cold = gamma_cold*R_gas/(gamma_cold-1)
     w2z = c2z
     w2 = w2z + w2t*1j
-    Ts2 = Ttr2 - np.abs(w2)**2/2/cp_air
-    Ps2 = Ptr2*(Ts2/Ttr2)**(gamma/(gamma-1))
+    Ts2 = Ttr2 - np.abs(w2)**2/2/cp_cold
+    Ps2 = Ptr2*(Ts2/Ttr2)**(gamma_cold/(gamma_cold-1))
     densitys2 = Ps2/Ts2/R_gas
     cz2 = massflow/densitys2/flow_area2
     return (cz2 - cz2,)
+
+def find_cz2_2(cz, Tt1, Tt2, Pt2, massflow, flow_area, gamma_cold, R_gas=287.05):
+    cp_cold = gamma_cold*R_gas/(gamma_cold-1)
+    Ts2 = Tt1 - cz**2/2/cp_cold
+    Ps2 = Pt2*(Ts2/Tt2)**(gamma_cold/(gamma_cold-1))
+    densitys2 = Ps2/R_gas/Ts2
+    cz2 = massflow/densitys2/flow_area
 
 def find_efficiency(stage_eff, c1, Tt1, Pt1, Pt3_req, spool_speed1, spool_speed2, Ptr2, Ttr2, massflow, flow_area2, loss_coeffs, gamma=1.4, R_gas=287.05):
     cp_air = gamma*R_gas/(gamma-1)
@@ -525,10 +537,6 @@ def SonicAreaRatio(M, gamma=1.4):
     bottom = 1+(gamma-1)/2*M**2
     AstarA = M*(top/bottom)**((gamma+1)/(2*(gamma-1)))
     return AstarA
-
-def find_mach3(mach, Tt, velocity, gamma, R_gas):
-    mach1 = velocity/np.sqrt(gamma*R_gas*isenf.static_temperature(mach, Tt))
-    return (mach1 - mach,)
 
 def turbine_vel_diagrams(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, massflow, tip_diam, hub_diam, spool_speed, stage_eff, gamma_hot, gamma_cold=1.4, R_gas=287.05):
     '''Calculations are acrosss one stage of a turbine. The subscripts denote stations across the stage.
