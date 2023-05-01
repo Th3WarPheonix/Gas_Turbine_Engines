@@ -3,70 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import IsentropicFlow as isenf
 import pandas as pd
-
-def convert_temps(temps, to:str):
-    """Convert the temperature from K to R"""
-    con_factor = 1.8
-    if to == 'imp':
-        try:
-            temps *= con_factor
-            return temps
-        except:
-            return np.array(temps)*con_factor
-    elif to == 'SI':
-        try:
-            temps = temps/con_factor
-            return temps
-        except:
-            return np.array(temps)/con_factor
-
-def convert_mass(mass, to:str):
-    """Convert the temperature from lbm to kg"""
-    con_factor = 2.20462
-    if to == 'imp':
-        try:
-            mass *= con_factor
-            return mass
-        except:
-            return np.array(mass)*con_factor
-    elif to == 'SI':
-        try:
-            mass = mass/con_factor
-            return mass
-        except:
-            return np.array(mass)/con_factor
-
-
-def convert_pressures(pressures, to:str):
-    """Convert the pressure from Pa to psia"""
-    con_factor = 6895.0
-    if to == 'imp':
-        try:
-            pressures = pressures/con_factor
-            return pressures
-        except:
-            return np.array(pressures)/con_factor
-    elif to == 'SI':
-        try:
-            pressures = pressures*con_factor
-            return pressures
-        except:
-            return np.array(pressures)*con_factor
-
-def convert_work(works, to:str):
-    """Convert the work from J to Btu"""
-    if to == 'imp':
-        try:
-            works = works / 1055 / 2.205
-            return works
-        except:
-            return np.array(works) / 1055 / 2.205
-    elif to == 'SI':
-        try:
-            works = works * 1055 * 2.205
-            return works
-        except:
-            return np.array(works) * 1055 * 2.205
+import Unit_Conversions as units
 
 def ambient_properties(mach:float, static_temperature0:float, static_pressure0:float, gamma:float=1.4, R_gas=287.05):
     total_temperature0 = isenf.total_temperature(mach, static_temperature0, gamma)
@@ -174,7 +111,7 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     fuel_density_emp = 6.532 # lbm/gal
     mission_length = 110 # minutes
     fuelflow = massflow2*fuel_air_ratio/m31 # kg/s
-    fuelflow_emp = convert_mass(fuelflow, 'imp') # lbm/s
+    fuelflow_emp = units.convert_mass(fuelflow, 'kg') # lbm/s
     fuelvol_emp = fuelflow_emp/fuel_density_emp # gal/s
     fuelvol_burned = fuelvol_emp*60*mission_length
     # Calculate the diameter needed to suck in the required mass flow
@@ -183,16 +120,16 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     inlet_diameter = np.sqrt(inlet_area*4/np.pi)
     inlet_diameter_emp = inlet_diameter/.0254
     # Conversions
-    temperautres_emps = convert_temps([Tambient, Tt0, Tt1, Ts1, Tt2, Tt13i, Tt13a, Tt3i, Tt3a, Tt4, Tt49, Tt495, Tt5, Ts9i, Ts9a, Ts19i, Ts19a], 'imp')
+    temperautres_emps = units.convert_temperature([Tambient, Tt0, Tt1, Ts1, Tt2, Tt13i, Tt13a, Tt3i, Tt3a, Tt4, Tt49, Tt495, Tt5, Ts9i, Ts9a, Ts19i, Ts19a], 'R')
     Ts0_emp, Tt0_emp, Tt1_emp, Ts1_emp, Tt2_emp, Tt13i_emp, Tt13a_emp, Tt3i_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt495_emp, Tt5_emp, Ts9i_emp, Ts9a_emp, Ts19i_emp, Ts19a_emp = temperautres_emps
-    pressures_emps = convert_pressures([Pambient, Pt0, Pt1, Ps1, Pt2, Pt13, Pt3, Pt4, Pt49, Pt5, Pambient, Pt9, Pt19], 'imp')
+    pressures_emps = units.convert_pressure([Pambient, Pt0, Pt1, Ps1, Pt2, Pt13, Pt3, Pt4, Pt49, Pt5, Pambient, Pt9, Pt19], 'psi')
     Ps0_emp, Pt0_emp, Pt1_emp, Ps1_emp, Pt2_emp, Pt13_emp, Pt3_emp, Pt4_emp, Pt49_emp, Pt5_emp, Ps9_emp, Pt9_emp, Pt19_emp = pressures_emps
 
     Vel1_emp = Vel1 / 12 / .0254
     Vel9_emp = Vel9 / 12 / .0254
     Vel19_emp = Vel19 / 12 / .0254
-    Wfi_emp, Wfa_emp, Wci_emp, Wca_emp = convert_work([Wfi, Wfa, Wci, Wca], 'imp')
-    massflow2_emp = convert_mass(massflow2, 'imp')
+    Wfi_emp, Wfa_emp, Wci_emp, Wca_emp = units.convert_energy([Wfi, Wfa, Wci, Wca], 'BTU')
+    massflow2_emp = units.convert_mass(massflow2, 'lbm')
     # Preparing presentation
     labels0 = np.array(['Total Temperature (R)', 'Static Temperature (R)', 'Total Pressure (psia)', 'Static Pressure (psia)', 'Mach', 'Mass flow (m/m2)'])
     station0 = pd.Series([Tt0_emp, Ts0_emp, Pt0_emp, Ps0_emp, mach0, 1+bypass_ratio], index=[np.repeat('0 Freestream', len(labels0)), labels0])
@@ -242,9 +179,9 @@ def engine_configurations(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan
     dfConfigs = pd.DataFrame()
     for i in range(len(comp_press_ratio)):
         stations, dfResult  = engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio[i], comp_eff, comp_press_ratio[i], m31, LHV, Tt4[i], comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust[i], gamma_hot)
-        dfConfigi = pd.DataFrame(pd.concat(stations), columns=['{}_{}_{}'.format(comp_press_ratio[i], int(convert_temps(Tt4[i], 'imp')-460), bypass_ratio[i])])
+        dfConfigi = pd.DataFrame(pd.concat(stations), columns=['{}_{}_{}'.format(comp_press_ratio[i], int(units.convert_temperature(Tt4[i], 'R')-460), bypass_ratio[i])])
         dfConfigs = pd.concat([dfConfigs, dfConfigi], axis=1)
-        dfResult.to_csv('Result_Config_{}_{}_{}.csv'.format(comp_press_ratio[i], int(convert_temps(Tt4[i], 'imp')-460), bypass_ratio[i]))
+        dfResult.to_csv('Result_Config_{}_{}_{}.csv'.format(comp_press_ratio[i], int(units.convert_temperature(Tt4[i], 'R')-460), bypass_ratio[i]))
     dfConfigs.index = dfConfigs.index.rename(['Station','Property'])
     dfConfigs.to_csv('Engine Configurations.csv')
     return dfConfigs
@@ -268,7 +205,7 @@ def engine_config_plots(dfConfigs, comp_press_ratio, Tt3max, Tt495max, Fuel_Vol,
     axs[0,0].set_title('Compressor Exit Temperature vs\nCompressor Pressure Ratio')
     axs[0,0].legend(loc='upper left')
 
-    Tt495s = convert_temps(dfConfigs.loc['4.95 LPT Entrance', 'Total Temperature (R)'], 'SI')-273
+    Tt495s = units.convert_temperature(dfConfigs.loc['4.95 LPT Entrance', 'Total Temperature (R)'], 'SI')-273
     slope2 = (Tt495s[1]-Tt495s[4])/(comp_press_ratio[1]-comp_press_ratio[4])
     pinch_point2 = (Tt495max - Tt495s[4])/(slope2)+comp_press_ratio[4]
     axs[0,1].plot([comp_press_ratio[1], comp_press_ratio[4]], [Tt495s[1], Tt495s[4]], color='green', zorder=1)
@@ -364,9 +301,9 @@ def rfp2():
     max_Tt9 = 880 # C
     # Conversions
     Ts0 += 273
-    Ps0 = convert_pressures(Ps0, 'SI')
-    Tt4 = convert_temps(np.array(turbine_inlet_temp) + 460, 'SI')
-    LHV = convert_work(LHV, 'SI')
+    Ps0 = units.convert_pressure(Ps0, 'Pa')
+    Tt4 = units.convert_temperature(np.array(turbine_inlet_temp) + 460, 'K')
+    LHV = units.convert_energy(LHV, 'J')
 
     dfConfigs = engine_configurations(Ts0, Ps0, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass, comp_eff, comp_press_ratio, massflow31, LHV, Tt4, comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, core_exh_coeff, fan_exh_coeff, thrust, gamma_hot)
     # engine_config_plots(dfConfigs, comp_press_ratio, max_Tt3, max_Tt495, fuel_vol, max_diam)
