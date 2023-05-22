@@ -1,2 +1,2 @@
 # Gas_Turbine_Engines
-Storage for equations for gas turbine engines
+Gas turbine engine cycle design equations and component design equations
