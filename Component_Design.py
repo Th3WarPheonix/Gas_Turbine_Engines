@@ -4,70 +4,6 @@ import IsentropicFlow as isenf
 import RootFinding as rootfind
 import Unit_Conversions as units
 
-def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0AHL:float, mach_throat:float, Tt0:float, Pt0:float, mach2:float, diffuser_angle:float, gamma:float=1.4, R_gas:float=287.05):
-    """
-    Notes
-    -----
-    Calculates the basic parameters of the inlet based on the size of the incoming stream tube and certain use designtaed design parameters.
-    Station numbering coincides with overall engine numbering
-    
-    Returns
-    -------
-    0: stream tube diameter, highlight diameter, throat diameter, fan diameter
-    1: diffuser length
-    2: diffuser length to throat diameter ratio
-    
-    Parameters
-    ----------
-    stream_density  : density of the freestream
-    stream_velocity : velocity of the freestream relative to the inlet
-    massflow : asd
-    A0AHL : ratio of the area of the freestream tube to the area of the inlet highlight
-    mach_throat : mach number at the throat of the inlet
-    Tt0 : total temperature of the freestream
-    Pt0 : total pressure of the freestream
-    Ts1 : asd
-    Ps1 : asd
-    mach2 : mach number at the compressor or fan face
-    diffuser_angle : full angle of the diffuser that starts at the inlet throat and ends at the compressor or fan face
-
-    Assumptions
-    -----------
-    0: No upwash induced by wings
-    1: The diffuser is a frustum of a cone
-    """
-    
-    '''Entrance calcs'''
-    streamtube_area = massflow/(stream_velocity*stream_density)
-    streamtube_diameter = np.sqrt(4*streamtube_area/np.pi)
-    highlight_area = streamtube_area/A0AHL
-    highlight_diameter = np.sqrt(4*highlight_area/np.pi)
-
-    '''Throat calcs'''
-    throat_static_temp  = isenf.T(mach_throat, Tt0)
-    throat_static_press = isenf.p(mach_throat, Pt0)
-    speed_of_sound = np.sqrt(gamma*R_gas*throat_static_temp)
-    throat_velocity = speed_of_sound*mach_throat
-    throat_density = throat_static_press/(R_gas*throat_static_temp)
-    throat_area = massflow/(throat_velocity*throat_density)
-    throat_diameter = np.sqrt(4*throat_area/np.pi)
-
-    '''Compressor face or fan face calcs'''
-    fan_static_temp  = isenf.T(mach2, Tt0)
-    fan_static_press = isenf.p(mach2, Pt0)
-    speed_of_sound = np.sqrt(gamma*R_gas*fan_static_temp)
-    fan_velocity = speed_of_sound*mach2
-    fan_density = fan_static_press/(R_gas*fan_static_temp)
-    fan_area = massflow/(fan_velocity*fan_density)
-    fan_diameter = np.sqrt(4*fan_area/np.pi)
-
-    '''Diffuser length calcs'''
-    throat_radius = throat_diameter/2
-    fan_radius = fan_diameter/2
-    diffuser_length = (fan_radius-throat_radius)/np.tan(diffuser_angle*np.pi/180)
-
-    return np.array([streamtube_diameter, highlight_diameter, throat_diameter, fan_diameter]), diffuser_length, diffuser_length/throat_diameter
-
 def find_mach(mach:float, massflow:float, densityt:float, Tt:float, area:float, gamma:float=1.4, R_gas:float=287.05):
     """
     Notes
@@ -160,6 +96,169 @@ def find_mach3(mach, Tt, velocity, gamma, R_gas):
     mach1 = velocity/np.sqrt(gamma*R_gas*isenf.static_temperature(mach, Tt))
     return (mach1 - mach,)
 
+def _combustor_casing_calcs(Tt31, Pt31, airflow, ref_vel, pitch_diam, R_gas):
+    """Calculations for determining casing values used in combustor function"""
+
+    rhot31 = Pt31/R_gas/Tt31
+    ref_area = airflow/rhot31/ref_vel
+    ref_height = ref_area/np.pi/pitch_diam
+    diam_inner_casing = (pitch_diam/2 - ref_height/2)*2
+    diam_outer_casing = (pitch_diam/2 + ref_height/2)*2
+    # print(units.convert_length([ref_height, diam_inner_casing, diam_outer_casing], 'in'), units.convert_area([ref_area], 'in'), units.convert_mass(rhot31, 'lbm')*(.0254*12)**3)
+    return (diam_inner_casing, diam_outer_casing, rhot31, ref_height, ref_area)
+
+def _combustor_dome_calcs(flow_split, airflow, passage_vel, diam_inner_casing, diam_outer_casing, rhot31, ref_height, pitch_diam, dome_height_set=None):
+    """Calculations for determining combustor dome values used in combustor function"""
+
+    area_passage = flow_split*airflow/rhot31/passage_vel  
+    diam_inner_pass = 2*np.sqrt(diam_inner_casing**2/4 + area_passage/np.pi)
+    diam_outer_pass = 2*np.sqrt(diam_outer_casing**2/4 - area_passage/np.pi)
+    height_inner_pass = (diam_inner_pass - diam_inner_casing)/2
+    height_outer_pass = (diam_outer_casing - diam_outer_pass)/2
+    # print(units.convert_length([diam_inner_pass, diam_outer_pass, height_inner_pass, height_outer_pass], 'in'), units.convert_area(area_passage, 'in'))
+
+    dome_height = ref_height - height_inner_pass - height_outer_pass
+    if dome_height_set: dome_height = dome_height_set
+    dome_area = np.pi*dome_height*pitch_diam
+    dome_vel = flow_split*airflow/rhot31/dome_area
+    # print(units.convert_length(dome_height, 'in'), units.convert_area(dome_area, 'in'), units.convert_speed(dome_vel, 'ft'))
+    
+    return (dome_height, dome_vel, diam_inner_pass, diam_outer_pass)
+
+def _space_rate_calcs(Pt31, airflow, fuelflow, pitch_diam, LHV, comblen_domeheight, height_turbine_inlet, dome_height):
+    """Calculations for determining space rate used in combustor function"""
+        
+    comb_length = comblen_domeheight*dome_height
+    area_entr = dome_height
+    area_exit = (dome_height+height_turbine_inlet)/2
+    comb_vol = (area_entr+area_exit)*np.pi*pitch_diam*comb_length/2
+    # print(comblen_domeheight, comb_length/.0254, comb_vol/(.0254*12)**3)
+
+    fuel_air = fuelflow/airflow
+    airflow_lb = units.convert_mass(airflow, 'lbm')
+    Pt31_atm = Pt31/101300
+    comb_vol_ft3 = comb_vol/(.0254*12)**3
+    space_rate = 3600*fuel_air*airflow_lb*LHV/Pt31_atm/comb_vol_ft3
+    # print('space rate', space_rate)
+
+    return (space_rate, comb_length)
+            
+def find_cz(c1:float, Ts0:float, Pt1:float, w0:float, ct1:float, massflow:float, flowarea1:float, spool_speed1:float, spool_speed2:float, cp_gas:float, gminusg:float, R_gas:float):
+    """
+    Notes
+    -----
+    The axial velocity of the air across the rotor is needed and must satisfy mass flow rates while also having a component in the azimuthal direction
+    c1 is the variable that is changing to converge the velocities
+    Follows the same numbering as parent function compressor_blade_design
+
+    Returns
+    -------
+    0: difference of axial velcoity guessed and calculated from mass flow equations
+    1: total temperature at station 1
+    2: static temperature at station 1
+
+    Parameters
+    ----------
+    c1 : total absolute velocity at after rotor
+    Ts0 : static temperature before rotor
+    Pt1 : total tempearture after rotor
+    w0 : relative velocity before rotor
+    ct1 : tangential absolute velocity after rotor
+    massflow : mass flow rate of air
+    flowarea1 : flow area at after rotor
+    spool_speed1 : linear velocity at pitchline before rotor
+    spool_speed2 : linear velocity at pitchline after rotor
+    cp_gas : specific heat at constant pressure
+    gminusg : (gamma-1)/gamma
+    R_gas : gas specific gas constant
+    
+    Assumptions
+    -----------
+    0:
+    """
+    cz1 = np.sqrt(c1**2-ct1**2)
+    w1 = np.sqrt(cz1**2 + (ct1-spool_speed2)**2)
+    Ttr0 = Ts0  + w0**2/2/cp_gas
+    Ttr1 = Ttr0 + (spool_speed2**2 -spool_speed1**2)/2/cp_gas
+    Ts1  = Ttr1 - w1**2/2/cp_gas
+    Tt1  = Ts1  + c1**2/2/cp_gas
+    Ps1 = Pt1*(Ts1/Tt1)**(1/gminusg)
+    densitys1 = Ps1/R_gas/Ts1
+    cz12 = massflow/densitys1/flowarea1
+
+    return (cz1 - cz12, Tt1, densitys1)
+
+def sonic_area_ratio(M, gamma=1.4):
+    '''Returns A*/A from incident Mach number'''
+    top = (gamma+1)/2
+    bottom = 1+(gamma-1)/2*M**2
+    AstarA = M*(top/bottom)**((gamma+1)/(2*(gamma-1)))
+    return AstarA
+
+def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0AHL:float, mach_throat:float, Tt0:float, Pt0:float, mach2:float, diffuser_angle:float, gamma:float=1.4, R_gas:float=287.05):
+    """
+    Notes
+    -----
+    Calculates the basic parameters of the inlet based on the size of the incoming stream tube and certain use designtaed design parameters.
+    Station numbering coincides with overall engine numbering
+    
+    Returns
+    -------
+    0: stream tube diameter, highlight diameter, throat diameter, fan diameter
+    1: diffuser length
+    2: diffuser length to throat diameter ratio
+    
+    Parameters
+    ----------
+    stream_density  : density of the freestream
+    stream_velocity : velocity of the freestream relative to the inlet
+    massflow : asd
+    A0AHL : ratio of the area of the freestream tube to the area of the inlet highlight
+    mach_throat : mach number at the throat of the inlet
+    Tt0 : total temperature of the freestream
+    Pt0 : total pressure of the freestream
+    Ts1 : asd
+    Ps1 : asd
+    mach2 : mach number at the compressor or fan face
+    diffuser_angle : full angle of the diffuser that starts at the inlet throat and ends at the compressor or fan face
+
+    Assumptions
+    -----------
+    0: No upwash induced by wings
+    1: The diffuser is a frustum of a cone
+    """
+    
+    '''Entrance calcs'''
+    streamtube_area = massflow/(stream_velocity*stream_density)
+    streamtube_diameter = np.sqrt(4*streamtube_area/np.pi)
+    highlight_area = streamtube_area/A0AHL
+    highlight_diameter = np.sqrt(4*highlight_area/np.pi)
+
+    '''Throat calcs'''
+    throat_static_temp  = isenf.T(mach_throat, Tt0)
+    throat_static_press = isenf.p(mach_throat, Pt0)
+    speed_of_sound = np.sqrt(gamma*R_gas*throat_static_temp)
+    throat_velocity = speed_of_sound*mach_throat
+    throat_density = throat_static_press/(R_gas*throat_static_temp)
+    throat_area = massflow/(throat_velocity*throat_density)
+    throat_diameter = np.sqrt(4*throat_area/np.pi)
+
+    '''Compressor face or fan face calcs'''
+    fan_static_temp  = isenf.T(mach2, Tt0)
+    fan_static_press = isenf.p(mach2, Pt0)
+    speed_of_sound = np.sqrt(gamma*R_gas*fan_static_temp)
+    fan_velocity = speed_of_sound*mach2
+    fan_density = fan_static_press/(R_gas*fan_static_temp)
+    fan_area = massflow/(fan_velocity*fan_density)
+    fan_diameter = np.sqrt(4*fan_area/np.pi)
+
+    '''Diffuser length calcs'''
+    throat_radius = throat_diameter/2
+    fan_radius = fan_diameter/2
+    diffuser_length = (fan_radius-throat_radius)/np.tan(diffuser_angle*np.pi/180)
+
+    return np.array([streamtube_diameter, highlight_diameter, throat_diameter, fan_diameter]), diffuser_length, diffuser_length/throat_diameter
+
 def compressor_design(max_tip_diam:float, max_tip_speed:float, aspect_ratio:float, work_coeff:float, total_work:float, inlet_radius_ratio:float, Tt2:float, Pt2:float, massflow2:float, Tt31:float, Pt31:float, massflow31:float, mach31:float, gamma:float=1.4, R_gas:float=287.05):
     """
     Notes
@@ -242,51 +341,6 @@ def compressor_design(max_tip_diam:float, max_tip_speed:float, aspect_ratio:floa
     
     return ((inlet_hub_radius*2, outlet_hub_diam, avg_gap, avg_blade_height), spool_speed_rpm, num_stages, compressor_length)
 
-def find_cz(c1:float, Ts0:float, Pt1:float, w0:float, ct1:float, massflow:float, flowarea1:float, spool_speed1:float, spool_speed2:float, cp_gas:float, gminusg:float, R_gas:float):
-    """
-    Notes
-    -----
-    The axial velocity of the air across the rotor is needed and must satisfy mass flow rates while also having a component in the azimuthal direction
-    c1 is the variable that is changing to converge the velocities
-    Follows the same numbering as parent function compressor_blade_design
-
-    Returns
-    -------
-    0: difference of axial velcoity guessed and calculated from mass flow equations
-    1: total temperature at station 1
-    2: static temperature at station 1
-
-    Parameters
-    ----------
-    c1 : total absolute velocity at after rotor
-    Ts0 : static temperature before rotor
-    Pt1 : total tempearture after rotor
-    w0 : relative velocity before rotor
-    ct1 : tangential absolute velocity after rotor
-    massflow : mass flow rate of air
-    flowarea1 : flow area at after rotor
-    spool_speed1 : linear velocity at pitchline before rotor
-    spool_speed2 : linear velocity at pitchline after rotor
-    cp_gas : specific heat at constant pressure
-    gminusg : (gamma-1)/gamma
-    R_gas : gas specific gas constant
-    
-    Assumptions
-    -----------
-    0:
-    """
-    cz1 = np.sqrt(c1**2-ct1**2)
-    w1 = np.sqrt(cz1**2 + (ct1-spool_speed2)**2)
-    Ttr0 = Ts0  + w0**2/2/cp_gas
-    Ttr1 = Ttr0 + (spool_speed2**2 -spool_speed1**2)/2/cp_gas
-    Ts1  = Ttr1 - w1**2/2/cp_gas
-    Tt1  = Ts1  + c1**2/2/cp_gas
-    Ps1 = Pt1*(Ts1/Tt1)**(1/gminusg)
-    densitys1 = Ps1/R_gas/Ts1
-    cz12 = massflow/densitys1/flowarea1
-
-    return (cz1 - cz12, Tt1, densitys1)
-
 def compressor_blade_design(Tt0:float, Pt0:float, mach0:float, massflow:float, flowarea1:float, CPR:float, num_stages:float, stage_eff:float, loss_coeff_rotor:float, loss_coeff_stator:float, spool_speed:float, pitch_diam1:float, pitch_diam2:float, gamma:float=1.4, R_gas:float=287.05):
     """
     Notes
@@ -295,7 +349,7 @@ def compressor_blade_design(Tt0:float, Pt0:float, mach0:float, massflow:float, f
     Station numbering coincides with compressor stage numbering: 1 before rotor, 2 between rotor and stator, 3 after stator
     Velocity representation
     c : absolute velocity
-    w : realtive to the rotor
+    w : relative to the rotor
     w = wz + wtj = axial flow + azimuthal flow
     c = cz + ctj = axial flow + azimuthal flow
  
@@ -324,7 +378,8 @@ def compressor_blade_design(Tt0:float, Pt0:float, mach0:float, massflow:float, f
 
     Assumptions
     -----------
-    0:
+    0: does not consider under turning
+    1: angle of attack before rotor and after stator are 0
     """
     gminusg = (gamma-1)/gamma
     cp_gas = gamma*R_gas/(gamma-1)
@@ -404,12 +459,13 @@ def airfoil_count():
     
     return num_airfoils
 
-def combustor(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch_diam:float, flow_split:float, passage_vel:float, min_diam_casing:float, max_diam_casing:float, max_dome_vel:float, comblendomeheight:float, fuelflow:float, LHV:float, length_height:float, wall_angle:float, height_turbine_inlet:float, gamma:float=1.4, R_gas:float=287.05):
+def combustor(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch_diam:float, flow_split:float, passage_vel:float, min_diam_casing:float, max_diam_casing:float, max_dome_vel:float, comblen_domeheight:float, fuelflow:float, LHV:float, length_height:float, wall_angle:float, height_turbine_inlet:float, gamma:float=1.4, R_gas:float=287.05):
     """
     Notes
     -----
     Design of an annular combustor using spacerate
-    Spacerate is a concept used a GE, and is heat released per second per volume. If the space rate is too small there is not enough heat released in the combustor volume and combustion will spill over to the turbine
+    Spacerate is a concept used a GE, and is heat released per second per volume. If the space rate is too small there is not enough heat released in the combustor volume and combustion will spill over to the turbine.
+    Iteration process
     Station numbering coincides with overall engine numbering
  
     Returns
@@ -418,6 +474,14 @@ def combustor(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch_diam:f
     1: diam_inner_casing
     2: diam_outer_casing
     3: diam_inner_pass
+    4: diam_outer_pass
+    5: comb_length
+    6: inlet_length
+    7: inlet_height
+    8: ref_height
+    9: dome_height
+    10: height_inner_pass
+    11: height_outer_pass
     
     Parameters
     ----------
@@ -440,48 +504,86 @@ def combustor(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch_diam:f
 
     Assumptions
     -----------
-    0:
+    0: combustion annulus is centered around the pitchline
+    1: igniters are centered around the pitchline
     """
-    rhot31 = Pt31/R_gas/Tt31
-    ref_area = airflow/rhot31/ref_vel
-    ref_height = ref_area/np.pi/pitch_diam
-    diam_inner_casing = (pitch_diam/2 - ref_height/2)*2
-    diam_outer_casing = (pitch_diam/2 + ref_height/2)*2
+    ref_vel_max = 100
+    passage_vel_max = 180
+    cldh_max = 2.5
+    cldh_min = 2
+
+    # Booleans for deteriming of the values are within the limits
+    casing = False
+    dome = False
+    spacerate = False
+
+    while casing is False:
+        diam_inner_casing, diam_outer_casing, rhot31, ref_height, ref_area = _combustor_casing_calcs(Tt31, Pt31, airflow, ref_vel, pitch_diam, R_gas)
+        if diam_inner_casing < min_diam_casing or diam_outer_casing > max_diam_casing:
+            ref_vel += 1
+            if ref_vel > ref_vel_max:
+                ref_vel = ref_vel_max
+                passage_vel += 1
+                if passage_vel > passage_vel_max:
+                    print('ERROR: Reference velocity and passage velocity at maximum and casing geomtery exceeds limits')
+                    break
+        else:
+            casing = True
+
+    while dome is False:
+        (dome_height, dome_vel, diam_inner_pass, diam_outer_pass) = _combustor_dome_calcs(flow_split, airflow, passage_vel, diam_inner_casing, diam_outer_casing, rhot31, ref_height, pitch_diam)
+        if dome_vel > max_dome_vel:
+            ref_vel -= 1
+            casing = False
+        else:
+            dome = True
     
-    if diam_inner_casing < min_diam_casing or diam_outer_casing > max_diam_casing:
-        print('---ERROR: CASING DIAMETER EXCEEDS LIMITS---')
-        print('Recommended action: change reference velocity')
-
-    area_passage = flow_split*airflow/rhot31/passage_vel  
-    diam_inner_pass = 2*np.sqrt(diam_inner_casing**2/4 + area_passage/np.pi)
-    diam_outer_pass = 2*np.sqrt(diam_outer_casing**2/4 - area_passage/np.pi)
-    height_inner_pass = (diam_inner_pass - diam_inner_casing)/2
-    height_outer_pass = (diam_outer_casing - diam_outer_pass)/2
-
-    dome_height = ref_height - height_inner_pass - height_outer_pass
-    dome_area = np.pi*dome_height*pitch_diam
-    dome_vel = flow_split*airflow/rhot31/dome_area
+    while casing is False:
+        diam_inner_casing, diam_outer_casing, rhot31, ref_height, ref_area = _combustor_casing_calcs(Tt31, Pt31, airflow, ref_vel, pitch_diam, R_gas)
+        if diam_inner_casing < min_diam_casing or diam_outer_casing > max_diam_casing:
+            passage_vel += 1
+            if passage_vel > passage_vel_max:
+                print('ERROR: Passage velocity at maximum, reference velocity at limit and casing geomtery exceeds limits.')
+                break
+        else:
+            casing = True
     
-    if dome_vel > max_dome_vel:
-        print('---ERROR: DOME VELOCITY EXCEEDS MAXIMUM---')
-        print('Recommended action: reduce reference velocity')
-        print('Dome Vel: {} \t Max: {}'.format(round(dome_vel, 2), round(max_dome_vel, 2)))
+    while spacerate is False:
+        space_rate, comb_length = _space_rate_calcs(Pt31, airflow, fuelflow, pitch_diam, LHV, comblen_domeheight, height_turbine_inlet, dome_height)
+        if space_rate > 10e6:
+            comblen_domeheight += .02
+            if comblen_domeheight > cldh_max:
+                comblen_domeheight = cldh_max
+                break
+        elif space_rate < 8e6:
+            comblen_domeheight -= .02
+            if comblen_domeheight < cldh_min:
+                comblen_domeheight = cldh_min
+                break
+        else:
+            spacerate = True
 
-    comb_length = comblendomeheight * dome_height
-    area_entr = ref_height * comb_length/2
-    area_exit = 1/2*(ref_height+height_turbine_inlet)
-    comb_vol = (area_entr+area_exit)*np.pi*pitch_diam*comb_length
+    dome_height_set = None
+    while spacerate is False:
+        space_rate, comb_length = _space_rate_calcs(Pt31, airflow, fuelflow, pitch_diam, LHV, comblen_domeheight, height_turbine_inlet, dome_height)
 
-    fuel_air = fuelflow/airflow
-    airflow_lb = units.convert_mass(airflow, 'lbm')
-    Ps31_atm = Pt31/101300
-    comb_vol_ft3 = comb_vol/(.0254*12)**3
-    space_rate = 3600*fuel_air*airflow_lb*LHV/Ps31_atm/comb_vol_ft3
-
-    if not 8e6 < space_rate < 10e6:
-        print('---ERROR: SPACE RATE EXCCEEDS LIMITS---')
-        print('Recommended action: change length to height ratio, then dome velocity')
-        print('Dome Vel: {:.3e} \t Bounds: {:.3e},{:.3e}'.format(space_rate, 8e6, 10e6))
+        if space_rate > 10e6:
+            # Volume is too small so the dome velocity needs to be decreased which increases the dome height which increases combustor volume
+            dome_vel -= 1*.0254*12
+            dome_area = flow_split*airflow/rhot31/dome_vel
+            dome_height = dome_area/np.pi/pitch_diam
+            dome_height_set = dome_height
+        elif space_rate < 8e6:
+            # Volume is too large so the dome velocity needs to be increased which changes the dome height which decreases combustor volume
+            dome_vel += 1
+            dome_area = flow_split*airflow/rhot31/dome_vel
+            dome_height = dome_area/np.pi/pitch_diam
+            dome_height_set = dome_height
+            if dome_vel > max_dome_vel:
+                print('ERROR: Dome velocity exceeded maximum and space rate is too low ')
+                break
+        else:
+            spacerate = True
 
     diff_area_ratio = 1+2*length_height*np.tan(wall_angle)
     inlet_area = ref_area/diff_area_ratio
@@ -491,8 +593,109 @@ def combustor(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch_diam:f
     circumference = np.pi*pitch_diam
     num_nozzles = np.ceil(circumference/dome_height)
 
-    return np.array((num_nozzles, diam_inner_casing, diam_outer_casing, diam_inner_pass, diam_outer_pass, comb_length, inlet_length, inlet_height, ref_height, dome_height, height_inner_pass, height_outer_pass))
+    return np.array((num_nozzles, diam_inner_casing, diam_outer_casing, diam_inner_pass, diam_outer_pass, comb_length, inlet_length, inlet_height, ref_height, dome_height))
 
+def turbine_blade_design(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, massflow, tip_diam, hub_diam, spool_speed, stage_eff, gamma_hot, gamma_cold=1.4, R_gas=287.05):
+    """
+    Notes
+    -----
+    Calculations are acrosss one stage of a trubine and at the pitchline
+    Station numbering coincides with compressor stage numbering: 1 before rotor, 2 between rotor and stator, 3 after stator
+    Velocity representation
+    c : absolute velocity
+    w : relative to the rotor
+    w = wz + wtj = axial flow + azimuthal flow
+    c = cz + ctj = axial flow + azimuthal flow
+ 
+    Returns
+    -------
+    0:
+    1:
+    2:
+    3:
+    
+    Parameters
+    ----------
+    Tt0 : total temperature after rotor
+    Pt0 : total pressure after rotor
+    mach0 : mach number at comprssor face
+    massflow : mass flow rate
+    flowarea1 : flow area after rotor
+    CPR : compressor pressure ratio
+    num_stages : number of stages
+    stage_eff : target efficiency of the stage
+    loss_coeff_rotor : cascade loss coefficient of the rotors
+    loss_coeff_stator : cascade loss coefficient of the stators
+    spool_speed : angular velocity of the spool
+    pitch_diam1 : pitch diameter before the rotor
+    pitch_diam2 : pitch diameter after the rotor
+
+    Assumptions
+    -----------
+    0: does not consider under turning
+    1: angle of attack before rotor and after stator are 0
+    """
+    cp_hot = gamma_hot*R_gas/(gamma_hot-1)
+    gminus = gamma_hot - 1
+    gplus  = gamma_hot + 1
+    gminusg = gminus/gamma_hot
+    
+    pitch_diam1 = (tip_diam + hub_diam)/2
+    spool_speed1 = spool_speed*pitch_diam1/2
+    # Before stator
+    flow_area = np.pi*(tip_diam**2 - hub_diam**2)/4
+    densityt0 = Pt0/Tt0/R_gas
+    mach0 = rootfind.newton2(find_mach, .3, massflow=massflow, densityt=densityt0, Tt=Tt0, area=flow_area, gamma=gamma_hot, R=R_gas)
+    print(mach0)
+    Ps0 = isenf.static_pressure(mach0, Pt0, gamma=gamma_hot)
+    Ts0 = isenf.static_temperature(mach0, Tt0, gamma=gamma_hot)
+    velocity0 = mach0*np.sqrt(gamma_hot*R_gas*Ts0)
+    Ps2 = isenf.static_pressure(mach2a, Pt2, gamma=gamma_hot)
+
+    # After stator
+    velocity1u = work/spool_speed1
+    mach1 = rootfind.newton2(find_mach2, .9, massflow=massflow, densityt=densityt0, Tt=Tt0, flow_area=flow_area, velocity_comp=velocity1u, gamma=gamma_hot, R_gas=R_gas)
+    unused, velocity1z = find_mach2(mach1, massflow, densityt0, Tt0, flow_area, velocity1u, gamma=gamma_hot, R_gas=R_gas)
+    alpha1 = np.arctan(velocity1u/velocity1z)
+    Ps1 = isenf.static_pressure(mach1, Pt0)
+    Ts1 = isenf.static_temperature(mach1, Tt0)
+    # Before rotor
+    reaction = (Ps1**gminusg - Ps2**gminusg)/(Pt0**gminusg - Ps2**gminusg)
+    relvel1u = velocity1u - spool_speed1
+    beta1 = np.tan(relvel1u/velocity1z)
+    relvel1 = np.sqrt(relvel1u**2 + velocity1z**2)
+    Ttr1 = Ts1 + relvel1**2/2/cp_hot
+    Ptr1 = Ps1*(Ttr1/Ts1)**(1/gminusg)
+    # After rotor
+    Ttr2 = Ttr1
+    machr2 = isenf.temperature_ratio2mach(Ps2/Ptr1, gamma=gamma_hot)
+    Ts2i = isenf.static_temperature(machr2, Ttr2, gamma=gamma_hot)
+    relvel2i = machr2*np.sqrt(gamma_hot*R_gas*Ts2i)
+    relvel2a = np.sqrt(stage_eff)*relvel2i
+    Ts2a = Ttr2 - relvel2a**2/2/cp_hot
+    densitys2 = Ps2/R_gas/Ts2a
+    beta2 = np.arccos(massflow/densitys2/relvel2a/flow_area)
+    relvel2u = relvel2a*np.sin(-beta2)
+    velocity2z = relvel2a*np.cos(-beta2)
+    velocity2u = relvel2u + spool_speed1
+    alpha2 = np.tan(velocity2u/velocity2z)
+    mach2 = np.sqrt(velocity2u*2+velocity2z**2)/np.sqrt(gamma_hot*R_gas*Ts2a)
+    Pt2 = isenf.total_pressure(mach2, Ps2, gamma=gamma_hot)
+    Tt2 = isenf.total_temperature(mach2, Ts2a, gamma=gamma_hot)
+    print(work, spool_speed1*(velocity1u-velocity2u))
+    
+    AstarA = sonic_area_ratio(mach2, gamma=gamma_hot)
+    Astar = flow_area*AstarA
+
+    PsPt_exit = Pambient/Pt2
+    mach_exit = isenf.pressure_ratio2mach(PsPt_exit, gamma_hot)
+    velocity_exit = mach_exit*np.sqrt(gamma_hot*R_gas*isenf.total_temperature(mach_exit, Tt2))
+    velocity_exit = Cv*velocity_exit
+    mach_exit = rootfind.newton2(find_mach3, mach_exit, Tt=Tt2, velocity=velocity_exit, gamma=gamma_hot, R_gas=R_gas)
+    AstarAexit = sonic_area_ratio(mach_exit, gamma_hot)
+    Aexit = AstarAexit**-1*Astar
+
+    return (reaction, (Tt0, Ts0, Ts1, Tt2, Ts2a), (Pt0, Ps0, Ps1, Pt2, Ps2), (alpha1, beta1, alpha2, beta2), (velocity0, velocity1u, velocity1z, velocity2z), (relvel1u, velocity1z, relvel2u, velocity2z), (mach0, mach1, mach2), (Astar, Aexit))
 
 def assignment5(dfConfigs, R_gas=287.05):
     Tt0 = units.convert_temperature(dfConfigs['Config 1'].loc['0 Freestream', 'Total Temperature (R)'], 'K')
@@ -559,7 +762,6 @@ def assignment7():
     pitch_diam2 = 21.37*.0254
     compressor_blade_design(Tt1, Pt1, mach0, massflow, flowarea2, CPR, num_stages, stage_eff, loss_coeff_rotor, loss_coeff_stator, spool_speed, pitch_diam1, pitch_diam2)
 
-
 def assignment8():
     # Compressor parameters
     Tt31 = 897.1 # R
@@ -583,7 +785,7 @@ def assignment8():
     ref_vel = 90 # ft/sec max = 100
     passage_vel = 150 # ft/sec max=180
     dome_vel_max = 80 # ft/sec
-    comblendomeheight = 2.25 # ratio max = 2.5
+    comblendomeheight = 2.25 # ratio max = 2.5 min=2
     # Conversions
     Tt31, Tt4 = units.convert_temperature([Tt31, Tt4])
     Pt31, Pt4 = units.convert_pressure([Pt31, Pt4])
@@ -599,88 +801,12 @@ def assignment8():
     height_turbine_inlet *= .0254
 
     result = combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, dome_vel_max, comblendomeheight, fuelflow, LHV, lengthheight, wall_angle, height_turbine_inlet)
-    print(result[0])
-    print(result[1:3]/.0254)
-    print(result[3:5]/.0254)
-    print(result[5:7]/.0254)
-    print(result[7:]/.0254)
-
-def SonicAreaRatio(M, gamma=1.4):
-    '''Returns A*/A from incident Mach number'''
-    top = (gamma+1)/2
-    bottom = 1+(gamma-1)/2*M**2
-    AstarA = M*(top/bottom)**((gamma+1)/(2*(gamma-1)))
-    return AstarA
-
-def turbine_vel_diagrams(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, massflow, tip_diam, hub_diam, spool_speed, stage_eff, gamma_hot, gamma_cold=1.4, R_gas=287.05):
-    '''Calculations are acrosss one stage of a turbine. The subscripts denote stations across the stage.
-    Station 0 is before the stator, station 1 is between the stator and the rotor, station 2 is after the rotor.
-    c = cz + ctj = axial flow + azimuthal flow.
-    c is absolute velocity.
-    w is realtive to the rotor.'''
-    cp_hot = gamma_hot*R_gas/(gamma_hot-1)
-    gminus = gamma_hot - 1
-    gplus  = gamma_hot + 1
-    gminusg = gminus/gamma_hot
-    
-    pitch_diam1 = (tip_diam + hub_diam)/2
-    spool_speed1 = spool_speed*pitch_diam1/2
-    # Before stator
-    flow_area = np.pi*(tip_diam**2 - hub_diam**2)/4
-    densityt0 = Pt0/Tt0/R_gas
-    mach0 = rootfind.newton2(find_mach, .3, massflow=massflow, densityt=densityt0, Tt=Tt0, area=flow_area, gamma=gamma_hot, R=R_gas)
-    print(mach0)
-    Ps0 = isenf.static_pressure(mach0, Pt0, gamma=gamma_hot)
-    Ts0 = isenf.static_temperature(mach0, Tt0, gamma=gamma_hot)
-    velocity0 = mach0*np.sqrt(gamma_hot*R_gas*Ts0)
-    Ps2 = isenf.static_pressure(mach2a, Pt2, gamma=gamma_hot)
-
-    # After stator
-    velocity1u = work/spool_speed1
-    mach1 = rootfind.newton2(find_mach2, .9, massflow=massflow, densityt=densityt0, Tt=Tt0, flow_area=flow_area, velocity_comp=velocity1u, gamma=gamma_hot, R_gas=R_gas)
-    unused, velocity1z = find_mach2(mach1, massflow, densityt0, Tt0, flow_area, velocity1u, gamma=gamma_hot, R_gas=R_gas)
-    alpha1 = np.arctan(velocity1u/velocity1z)
-    Ps1 = isenf.static_pressure(mach1, Pt0)
-    Ts1 = isenf.static_temperature(mach1, Tt0)
-    # Before rotor
-    reaction = (Ps1**gminusg - Ps2**gminusg)/(Pt0**gminusg - Ps2**gminusg)
-    relvel1u = velocity1u - spool_speed1
-    beta1 = np.tan(relvel1u/velocity1z)
-    relvel1 = np.sqrt(relvel1u**2 + velocity1z**2)
-    Ttr1 = Ts1 + relvel1**2/2/cp_hot
-    Ptr1 = Ps1*(Ttr1/Ts1)**(1/gminusg)
-    # After rotor
-    Ttr2 = Ttr1
-    machr2 = isenf.temperature_ratio2mach(Ps2/Ptr1, gamma=gamma_hot)
-    Ts2i = isenf.static_temperature(machr2, Ttr2, gamma=gamma_hot)
-    relvel2i = machr2*np.sqrt(gamma_hot*R_gas*Ts2i)
-    relvel2a = np.sqrt(stage_eff)*relvel2i
-    Ts2a = Ttr2 - relvel2a**2/2/cp_hot
-    densitys2 = Ps2/R_gas/Ts2a
-    beta2 = np.arccos(massflow/densitys2/relvel2a/flow_area)
-    relvel2u = relvel2a*np.sin(-beta2)
-    velocity2z = relvel2a*np.cos(-beta2)
-    velocity2u = relvel2u + spool_speed1
-    alpha2 = np.tan(velocity2u/velocity2z)
-    mach2 = np.sqrt(velocity2u*2+velocity2z**2)/np.sqrt(gamma_hot*R_gas*Ts2a)
-    Pt2 = isenf.total_pressure(mach2, Ps2, gamma=gamma_hot)
-    Tt2 = isenf.total_temperature(mach2, Ts2a, gamma=gamma_hot)
-    print(work, spool_speed1*(velocity1u-velocity2u))
-    
-    AstarA = SonicAreaRatio(mach2, gamma=gamma_hot)
-    Astar = flow_area*AstarA
-
-    PsPt_exit = Pambient/Pt2
-    mach_exit = isenf.pressure_ratio2mach(PsPt_exit, gamma_hot)
-    velocity_exit = mach_exit*np.sqrt(gamma_hot*R_gas*isenf.total_temperature(mach_exit, Tt2))
-    velocity_exit = Cv*velocity_exit
-    mach_exit = rootfind.newton2(find_mach3, mach_exit, Tt=Tt2, velocity=velocity_exit, gamma=gamma_hot, R_gas=R_gas)
-    AstarAexit = SonicAreaRatio(mach_exit, gamma_hot)
-    Aexit = AstarAexit**-1*Astar
-
-    return (reaction, (Tt0, Ts0, Ts1, Tt2, Ts2a), (Pt0, Ps0, Ps1, Pt2, Ps2), (alpha1, beta1, alpha2, beta2), (velocity0, velocity1u, velocity1z, velocity2z), (relvel1u, velocity1z, relvel2u, velocity2z), (mach0, mach1, mach2), (Astar, Aexit))
-    
-    
+    # print(result[0])
+    # print(result[1:3]/.0254)
+    # print(result[3:5]/.0254)
+    # print(result[5:7]/.0254)
+    # print(result[7:]/.0254)
+   
 def assignment10():
     Ps0 = 4.364
     Tt4 = 2560 # R
@@ -709,7 +835,7 @@ def assignment10():
     hub_diam = hub_diam *.0254
     N *= 2*np.pi/60
 
-    res = turbine_vel_diagrams(Tt4, Pt4, Pt49, Ps0, mach49, nozzle_coeff, work, alpha2, massflow4, tip_diam, hub_diam, N, eff_turb, gamma_hot, gamma_cold=1.4, R_gas=287.05)
+    res = turbine_blade_design(Tt4, Pt4, Pt49, Ps0, mach49, nozzle_coeff, work, alpha2, massflow4, tip_diam, hub_diam, N, eff_turb, gamma_hot, gamma_cold=1.4, R_gas=287.05)
     print('reaction', np.array([res[0]]))
     print('temp',np.array([res[1]])*9/5)
     print('press',np.array([res[2]])/6895)
@@ -721,4 +847,4 @@ def assignment10():
 
 
 if __name__ == '__main__':
-    assignment7()
+    assignment8()
