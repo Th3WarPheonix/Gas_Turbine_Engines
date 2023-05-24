@@ -117,28 +117,28 @@ def convert_length(length, units:str='m in'):
     match units:
         case 'm in':
             try:
-                length = length/factor1
-                return length
-            except:
-                return np.array(length)/factor1
-        case 'm ft':
-            try:
-                length = length/factor2
-                return length
-            except:
-                return np.array(length)/factor2
-        case 'in':
-            try:
                 length = length*factor1
                 return length
             except:
                 return np.array(length)*factor1
-        case 'ft':
+        case 'm ft':
             try:
                 length = length*factor2
                 return length
             except:
                 return np.array(length)*factor2
+        case 'in':
+            try:
+                length = length/factor1
+                return length
+            except:
+                return np.array(length)/factor1
+        case 'ft':
+            try:
+                length = length/factor2
+                return length
+            except:
+                return np.array(length)/factor2
         case _:
             print('Did not convert length')
 
@@ -153,28 +153,28 @@ def convert_area(area, units:str='m in'):
     match units:
         case 'm in':
             try:
-                area = area/factor1
-                return area
-            except:
-                return np.array(area)/factor1
-        case 'm ft':
-            try:
-                area = area/factor2
-                return area
-            except:
-                return np.array(area)/factor2
-        case 'in':
-            try:
                 area = area*factor1
                 return area
             except:
                 return np.array(area)*factor1
-        case 'ft':
+        case 'm ft':
             try:
                 area = area*factor2
                 return area
             except:
                 return np.array(area)*factor2
+        case 'in':
+            try:
+                area = area/factor1
+                return area
+            except:
+                return np.array(area)/factor1
+        case 'ft':
+            try:
+                area = area/factor2
+                return area
+            except:
+                return np.array(area)/factor2
         case _:
             print('Did not convert area')
 
@@ -195,28 +195,28 @@ def convert_speed(speed, units:str='m in'):
     match units:
         case 'm in':
             try:
-                speed = speed/factor1
-                return speed
-            except:
-                return np.array(speed)/factor1
-        case 'm ft':
-            try:
-                speed = speed/factor2
-                return speed
-            except:
-                return np.array(speed)/factor2
-        case 'in':
-            try:
                 speed = speed*factor1
                 return speed
             except:
                 return np.array(speed)*factor1
-        case 'ft':
+        case 'm ft':
             try:
                 speed = speed*factor2
                 return speed
             except:
                 return np.array(speed)*factor2
+        case 'in':
+            try:
+                speed = speed/factor1
+                return speed
+            except:
+                return np.array(speed)/factor1
+        case 'ft':
+            try:
+                speed = speed/factor2
+                return speed
+            except:
+                return np.array(speed)/factor2
         case 'mph ft':
             try:
                 speed = speed*factor3
