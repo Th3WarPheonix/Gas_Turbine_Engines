@@ -595,12 +595,12 @@ def combustor_design(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch
 
     return np.array((num_nozzles, diam_inner_casing, diam_outer_casing, diam_inner_pass, diam_outer_pass, comb_length, inlet_length, inlet_height, ref_height, dome_height))
 
-def turbine_blade_design(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, massflow, tip_diam, hub_diam, spool_speed, stage_eff, gamma_hot, gamma_cold=1.4, R_gas=287.05):
+def turbine_blade_design(Tt0, Pt0, Tt2, Pt2, Pambient, Cv, work, alpha2, massflow, tip_diam, hub_diam, spool_speed, stage_eff, gamma_hot, gamma_cold=1.4, R_gas=287.05):
     """
     Notes
     -----
     Calculations are acrosss one stage of a trubine and at the pitchline
-    Station numbering coincides with compressor stage numbering: 1 before rotor, 2 between rotor and stator, 3 after stator
+    Station numbering coincides with compressor stage numbering: 0 before stator, 1 between stator and rotor, 3 after rotor
     Velocity representation
     c : absolute velocity
     w : relative to the rotor
@@ -632,8 +632,13 @@ def turbine_blade_design(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, mass
 
     Assumptions
     -----------
-    0: does not consider under turning
-    1: angle of attack before rotor and after stator are 0
+    0: single stage
+    1: constant pitchline
+    2: constant flow area
+    3: cooling flows not considered
+    4: perfectly matched nozzle pressure conditions
+    5: adiabatic
+    6: no cascade losses
     """
     cp_hot = gamma_hot*R_gas/(gamma_hot-1)
     gminus = gamma_hot - 1
@@ -645,12 +650,16 @@ def turbine_blade_design(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, mass
     # Before stator
     flow_area = np.pi*(tip_diam**2 - hub_diam**2)/4
     densityt0 = Pt0/Tt0/R_gas
-    mach0 = rootfind.newton2(find_mach, .3, massflow=massflow, densityt=densityt0, Tt=Tt0, area=flow_area, gamma=gamma_hot, R=R_gas)
+    mach0 = rootfind.newton2(find_mach, .3, massflow=massflow, densityt=densityt0, Tt=Tt0, area=flow_area, gamma=gamma_hot, R_gas=R_gas)
     print(mach0)
     Ps0 = isenf.static_pressure(mach0, Pt0, gamma=gamma_hot)
     Ts0 = isenf.static_temperature(mach0, Tt0, gamma=gamma_hot)
     velocity0 = mach0*np.sqrt(gamma_hot*R_gas*Ts0)
-    Ps2 = isenf.static_pressure(mach2a, Pt2, gamma=gamma_hot)
+
+    # After rotor
+    densityt2 = Pt2/Tt2/R_gas
+    mach2 = rootfind.newton2(find_mach, .3, massflow=massflow, densityt=densityt2, Tt=Tt2, area=flow_area, gamma=gamma_hot, R_gas=R_gas)
+    Ps2 = isenf.static_pressure(mach2, Pt2)
 
     # After stator
     velocity1u = work/spool_speed1
@@ -659,6 +668,7 @@ def turbine_blade_design(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, mass
     alpha1 = np.arctan(velocity1u/velocity1z)
     Ps1 = isenf.static_pressure(mach1, Pt0)
     Ts1 = isenf.static_temperature(mach1, Tt0)
+
     # Before rotor
     reaction = (Ps1**gminusg - Ps2**gminusg)/(Pt0**gminusg - Ps2**gminusg)
     relvel1u = velocity1u - spool_speed1
@@ -666,9 +676,10 @@ def turbine_blade_design(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, mass
     relvel1 = np.sqrt(relvel1u**2 + velocity1z**2)
     Ttr1 = Ts1 + relvel1**2/2/cp_hot
     Ptr1 = Ps1*(Ttr1/Ts1)**(1/gminusg)
+
     # After rotor
-    Ttr2 = Ttr1
-    machr2 = isenf.temperature_ratio2mach(Ps2/Ptr1, gamma=gamma_hot)
+    Ttr2 = Ttr1 # constant pitchline
+    machr2 = isenf.pressure_ratio2mach(Ps2/Ptr1, gamma=gamma_hot)
     Ts2i = isenf.static_temperature(machr2, Ttr2, gamma=gamma_hot)
     relvel2i = machr2*np.sqrt(gamma_hot*R_gas*Ts2i)
     relvel2a = np.sqrt(stage_eff)*relvel2i
@@ -694,7 +705,7 @@ def turbine_blade_design(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, mass
     mach_exit = rootfind.newton2(find_mach3, mach_exit, Tt=Tt2, velocity=velocity_exit, gamma=gamma_hot, R_gas=R_gas)
     AstarAexit = sonic_area_ratio(mach_exit, gamma_hot)
     Aexit = AstarAexit**-1*Astar
-
+    print(relvel1u/.0254/12)
     return (reaction, (Tt0, Ts0, Ts1, Tt2, Ts2a), (Pt0, Ps0, Ps1, Pt2, Ps2), (alpha1, beta1, alpha2, beta2), (velocity0, velocity1u, velocity1z, velocity2z), (relvel1u, velocity1z, relvel2u, velocity2z), (mach0, mach1, mach2), (Astar, Aexit))
 
 def inlet_design_test_values(dfConfigs, R_gas=287.05):
@@ -829,22 +840,23 @@ def turbine_blade_design_test_values():
     Pt4  = units.convert_pressure(Pt4)
     Ps0  = units.convert_pressure(Ps0)
     Pt49 = units.convert_pressure(Pt49)
+    Tt49 = units.convert_temperature(Tt49)
     massflow4 = units.convert_mass(massflow4)
     work = units.convert_energy(work)
     tip_diam = tip_diam *.0254
     hub_diam = hub_diam *.0254
     N *= 2*np.pi/60
 
-    res = turbine_blade_design(Tt4, Pt4, Pt49, Ps0, mach49, nozzle_coeff, work, alpha2, massflow4, tip_diam, hub_diam, N, eff_turb, gamma_hot, gamma_cold=1.4, R_gas=287.05)
-    print('reaction', np.array([res[0]]))
-    print('temp',np.array([res[1]])*9/5)
-    print('press',np.array([res[2]])/6895)
-    print('angle',np.array([res[3]])*180/np.pi)
-    print('abs vel',np.array([res[4]])/.0254/12)
-    print('rel vel',np.array([res[5]])/.0254/12)
-    print('mach',np.array([res[6]]))
-    print('area',np.array([res[7]])/(.0254*12)**2)
+    res = turbine_blade_design(Tt4, Pt4, Tt49, Pt49, Ps0, nozzle_coeff, work, alpha2, massflow4, tip_diam, hub_diam, N, eff_turb, gamma_hot, gamma_cold=1.4, R_gas=287.05)
+    # print('reaction', np.array([res[0]]))
+    # print('temp',np.array([res[1]])*9/5)
+    # print('press',np.array([res[2]])/6895)
+    # print('angle',np.array([res[3]])*180/np.pi)
+    # print('abs vel',np.array([res[4]])/.0254/12)
+    # print('rel vel',np.array([res[5]])/.0254/12)
+    # print('mach',np.array([res[6]]))
+    # print('area',np.array([res[7]])/(.0254*12)**2)
 
 
 if __name__ == '__main__':
-    combustor_design_test_values()
+    turbine_blade_design_test_values()
