@@ -2,92 +2,13 @@
 import numpy as np
 import IsentropicFlow as isenf
 import RootFinding as rootfind
-import matplotlib.pyplot as plt
+import Unit_Conversions as units
 
-def convert_temps(temps, to:str='K'):
-    """Convert temperature between Kelvin and Rankine
-    to = 'K' for converting to Kelvin
-    to = 'R' for converting to Rankine"""
-    con_factor = 1.8
-    if to == 'R':
-        try:
-            temps *= con_factor
-            return temps
-        except:
-            return np.array(temps)*con_factor
-    elif to == 'K':
-        try:
-            temps = temps/con_factor
-            return temps
-        except:
-            return np.array(temps)/con_factor
-    else:
-        print('Did not convert temperatures')
-
-def convert_mass(mass, to:str='kg'):
-    """Convert mass between lbm and kg
-    to = 'lbm' for converting to lbm
-    to = 'kg' for converting to kg"""
-    con_factor = 2.20462
-    if to == 'lbm':
-        try:
-            mass *= con_factor
-            return mass
-        except:
-            return np.array(mass)*con_factor
-    elif to == 'kg':
-        try:
-            mass = mass/con_factor
-            return mass
-        except:
-            return np.array(mass)/con_factor
-    else:
-        print('Did not convert masses')
-
-def convert_pressures(pressures, to:str='Pa'):
-    """Convert pressure between Pascals and PSI
-    to = 'Pa' for converting to Pascals
-    to = 'psi' for converting to PSI"""
-    con_factor = 6895.0
-    if to == 'psi':
-        try:
-            pressures = pressures/con_factor
-            return pressures
-        except:
-            return np.array(pressures)/con_factor
-    elif to == 'Pa':
-        try:
-            pressures = pressures*con_factor
-            return pressures
-        except:
-            return np.array(pressures)*con_factor
-    else:
-        print('Did not convert pressures')
-
-def convert_energy(works, to:str='J'):
-    """Convert mass specific energy/work between Btu/lbm and J/kg
-    to = 'J' for converting to J/kg
-    to = 'BTU' for converting to BTU/lbm"""
-    if to == 'BTU':
-        try:
-            works = works / 1055 / 2.205
-            return works
-        except:
-            return np.array(works) / 1055 / 2.205
-    elif to == 'J':
-        try:
-            works = works * 1055 * 2.205
-            return works
-        except:
-            return np.array(works) * 1055 * 2.205
-    else:
-        print('Did not convert energy')
-        
 def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0AHL:float, mach_throat:float, Tt0:float, Pt0:float, mach2:float, diffuser_angle:float, gamma:float=1.4, R_gas:float=287.05):
     """
     Notes
     -----
-    Calculates the basic parameters of the inlet based on the size of the incoming stream tube and certain use designtaed design parameters
+    Calculates the basic parameters of the inlet based on the size of the incoming stream tube and certain use designtaed design parameters.
     Station numbering coincides with overall engine numbering
     
     Returns
@@ -147,15 +68,65 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
 
     return np.array([streamtube_diameter, highlight_diameter, throat_diameter, fan_diameter]), diffuser_length, diffuser_length/throat_diameter
 
-def find_mach(mach, massflow, densityt, Tt, area, gamma=1.4, R=287.05):
-    """Find Mach number from given massflow, total temperature, density, and flow area"""
+def find_mach(mach:float, massflow:float, densityt:float, Tt:float, area:float, gamma:float=1.4, R_gas:float=287.05):
+    """
+    Notes
+    -----
+    Find Mach number from given massflow, total temperature, density, and flow area.
+    Mach number is the variable that is changing to converge get the areas to match.
+    Function to be used with the newton2 solver in the RootFinding module.
+    Function iterates even though only one unknown is present because rearraning the equations is too complicated
+    
+    Returns
+    -------
+    0: difference between flow area calculated from convservation of mass and the given flow area
+    
+    Parameters
+    ----------
+    mach : mach number
+    massflow : mass flow rate
+    densityt : total density
+    Tt : total temperature
+    area : flow area to be matched
+
+    Assumptions
+    -----------
+    0: 
+    """
     densitys = isenf.static_density(mach, densityt, gamma=gamma)
     Ts = isenf.static_temperature(mach, Tt, gamma=gamma)
-    sound_speed = np.sqrt(gamma*R*Ts)
+    sound_speed = np.sqrt(gamma*R_gas*Ts)
     return (massflow/densitys/mach/sound_speed - area,)
 
 def find_mach2(mach, massflow, densityt, Tt, flow_area, velocity_comp, gamma=1.4, R_gas=287.05):
-    """Find Mach number from given massflow, total temperature, density, and flow area and a given velocity component"""
+    """
+    Notes
+    -----
+    Find Mach number from given massflow, total temperature, density, and flow area and a given velocity component
+    Mach number is the variable that is changing to converge get the velocitys to match.
+    The function is used when a certain velocity needs to be known to satisfy mass conservation but there is a velocity component that does not contribute to conservation of mass. As in when only the axial component of exhaust velocity contributes to mass flow, and not the azimthual component, in a turbine.
+    The squared velocities are compared because during iterations velocity component might, impossibly, be greater than the total velocity of the exhaust.
+    Function to be used with the newton2 solver in the RootFinding module.
+    Function iterates even though only one unknown is present because rearraning the equations is too complicated
+    
+    Returns
+    -------
+    0: difference between squared velocities calculated from mach number equations and from mass flow equations
+    1: velocity component
+    
+    Parameters
+    ----------
+    mach : mach number
+    massflow : mass flow rate
+    densityt : total density
+    Tt : total temperature
+    area : flow area to be matched
+    velocity_component : velocity component that does not contirubte to mass flow
+
+    Assumptions
+    -----------
+    0: 
+    """
     Ts1 = isenf.static_temperature(mach, Tt, gamma=gamma)
     densitys1 = isenf.static_density(mach, densityt, gamma=gamma)
     velocity1zsq = (mach*np.sqrt(gamma*R_gas*Ts1))**2 - velocity_comp**2
@@ -163,7 +134,29 @@ def find_mach2(mach, massflow, densityt, Tt, flow_area, velocity_comp, gamma=1.4
     return (veclocity1zsq2 - velocity1zsq, np.sqrt(velocity1zsq))
 
 def find_mach3(mach, Tt, velocity, gamma, R_gas):
-    """Find mach number from given total temperature and velocity"""
+    """
+    Notes
+    -----
+    Find mach number from given total temperature and velocity
+    Mach number is the variable that is changing to converge get the mach numbers to match.
+    Function to be used with the newton2 solver in the RootFinding module.
+    Function iterates even though only one unknown is present because rearraning the equations is too complicated
+    
+    Returns
+    -------
+    0: difference between squared velocities calculated from mach number equations and from mass flow equations
+    1: velocity component
+    
+    Parameters
+    ----------
+    mach : mach number
+    Tt : total temperature
+    velocity : velocity the air should be
+
+    Assumptions
+    -----------
+    0: 
+    """
     mach1 = velocity/np.sqrt(gamma*R_gas*isenf.static_temperature(mach, Tt))
     return (mach1 - mach,)
 
@@ -249,24 +242,56 @@ def compressor_design(max_tip_diam:float, max_tip_speed:float, aspect_ratio:floa
     
     return ((inlet_hub_radius*2, outlet_hub_diam, avg_gap, avg_blade_height), spool_speed_rpm, num_stages, compressor_length)
 
-def find_cz(c2, Ts1, Pt2, w1, ct2, massflow, flowarea2, spool_speed1, spool_speed2, cp_gas, gminusg, R_gas):
-    cz2 = np.sqrt(c2**2-ct2**2)
-    w2 = np.sqrt(cz2**2 + (ct2-spool_speed2)**2)
-    Ttr1 = Ts1  + w1**2/2/cp_gas
-    Ttr2 = Ttr1 + (spool_speed2**2 -spool_speed1**2)/2/cp_gas
-    Ts2  = Ttr2 - w2**2/2/cp_gas
-    Tt2  = Ts2  + c2**2/2/cp_gas
-    Ps2 = Pt2*(Ts2/Tt2)**(1/gminusg)
-    densitys2 = Ps2/R_gas/Ts2
-    cz22 = massflow/densitys2/flowarea2
-
-    return (cz2 - cz22, Tt2, densitys2)
-
-def compressor_blade_design(Tt1, Pt1, mach1, massflow, flowarea2, CPR, num_stages, stage_eff, loss_coeff_rotor, loss_coeff_stator, spool_speed, pitch_diam1, pitch_diam2, gamma=1.4, R_gas=287.05):
+def find_cz(c1:float, Ts0:float, Pt1:float, w0:float, ct1:float, massflow:float, flowarea1:float, spool_speed1:float, spool_speed2:float, cp_gas:float, gminusg:float, R_gas:float):
     """
     Notes
     -----
-    Calculations are acrosss one stage of a compressor
+    The axial velocity of the air across the rotor is needed and must satisfy mass flow rates while also having a component in the azimuthal direction
+    c1 is the variable that is changing to converge the velocities
+    Follows the same numbering as parent function compressor_blade_design
+
+    Returns
+    -------
+    0: difference of axial velcoity guessed and calculated from mass flow equations
+    1: total temperature at station 1
+    2: static temperature at station 1
+
+    Parameters
+    ----------
+    c1 : total absolute velocity at after rotor
+    Ts0 : static temperature before rotor
+    Pt1 : total tempearture after rotor
+    w0 : relative velocity before rotor
+    ct1 : tangential absolute velocity after rotor
+    massflow : mass flow rate of air
+    flowarea1 : flow area at after rotor
+    spool_speed1 : linear velocity at pitchline before rotor
+    spool_speed2 : linear velocity at pitchline after rotor
+    cp_gas : specific heat at constant pressure
+    gminusg : (gamma-1)/gamma
+    R_gas : gas specific gas constant
+    
+    Assumptions
+    -----------
+    0:
+    """
+    cz1 = np.sqrt(c1**2-ct1**2)
+    w1 = np.sqrt(cz1**2 + (ct1-spool_speed2)**2)
+    Ttr0 = Ts0  + w0**2/2/cp_gas
+    Ttr1 = Ttr0 + (spool_speed2**2 -spool_speed1**2)/2/cp_gas
+    Ts1  = Ttr1 - w1**2/2/cp_gas
+    Tt1  = Ts1  + c1**2/2/cp_gas
+    Ps1 = Pt1*(Ts1/Tt1)**(1/gminusg)
+    densitys1 = Ps1/R_gas/Ts1
+    cz12 = massflow/densitys1/flowarea1
+
+    return (cz1 - cz12, Tt1, densitys1)
+
+def compressor_blade_design(Tt0:float, Pt0:float, mach0:float, massflow:float, flowarea1:float, CPR:float, num_stages:float, stage_eff:float, loss_coeff_rotor:float, loss_coeff_stator:float, spool_speed:float, pitch_diam1:float, pitch_diam2:float, gamma:float=1.4, R_gas:float=287.05):
+    """
+    Notes
+    -----
+    Calculations are acrosss one stage of a compressor and at the pitchline
     Station numbering coincides with compressor stage numbering: 1 before rotor, 2 between rotor and stator, 3 after stator
     Velocity representation
     c : absolute velocity
@@ -283,28 +308,23 @@ def compressor_blade_design(Tt1, Pt1, mach1, massflow, flowarea2, CPR, num_stage
     
     Parameters
     ----------
-    Tt1 : total temperature in front of the rotor
-    Pt1 : total pressure in front of the rotor
-    massflow : mass flow into the stage
-    alpha1 : angle of attack of air with respect to the rotor
-    press_ratio : pressure ratio of the stage
+    Tt0 : total temperature after rotor
+    Pt0 : total pressure after rotor
+    mach0 : mach number at comprssor face
+    massflow : mass flow rate
+    flowarea1 : flow area after rotor
+    CPR : compressor pressure ratio
     num_stages : number of stages
-    Dt1 :
-    Dp1 :
-    Dp2 :
-    flow_area3 :
-    spool_speed :
-    stage_eff :
-    loss_coeffr :
-    loss_coeffs :
-    reaction :
-    alpha3 :
+    stage_eff : target efficiency of the stage
+    loss_coeff_rotor : cascade loss coefficient of the rotors
+    loss_coeff_stator : cascade loss coefficient of the stators
+    spool_speed : angular velocity of the spool
+    pitch_diam1 : pitch diameter before the rotor
+    pitch_diam2 : pitch diameter after the rotor
 
     Assumptions
     -----------
     0:
-    1:
-    2:
     """
     gminusg = (gamma-1)/gamma
     cp_gas = gamma*R_gas/(gamma-1)
@@ -312,38 +332,40 @@ def compressor_blade_design(Tt1, Pt1, mach1, massflow, flowarea2, CPR, num_stage
     spool_speed1 = spool_speed*pitch_diam1/2
     spool_speed2 = spool_speed*pitch_diam2/2
 
-    Ts1 = isenf.static_temperature(mach1, Tt1)
-    Ps1 = isenf.static_pressure(mach1, Pt1)
-    densitys1 = Ps1/R_gas/Ts1
-    sound_speed1 = np.sqrt(gamma*R_gas*Ts1)
-    c1 = mach1*sound_speed1
-    w1 = np.sqrt(c1**2 + spool_speed1**2)
+    Ts0 = isenf.static_temperature(mach0, Tt0)
+    Ps0 = isenf.static_pressure(mach0, Pt0)
+    densitys0 = Ps0/R_gas/Ts0
+    sound_speed1 = np.sqrt(gamma*R_gas*Ts0)
+    c0 = mach0*sound_speed1
+    w0 = np.sqrt(c0**2 + spool_speed1**2)
 
     stage_press_ratio = CPR**(1/num_stages)
     stage_temp_ratio = 1 + 1/stage_eff*(stage_press_ratio**gminusg-1)
-    Tt3 = Tt1*stage_temp_ratio
-    Pt3_target = Pt1*stage_press_ratio
-    Pt2 = Pt3_target
-    work = cp_gas*Tt1*(stage_temp_ratio-1)
-    ct2 = work/spool_speed2
+    Tt2 = Tt0*stage_temp_ratio
+    Pt2_target = Pt0*stage_press_ratio
+    Pt1 = Pt2_target
+    work = cp_gas*Tt0*(stage_temp_ratio-1)
+    ct1 = work/spool_speed2
     
-    c2 = 524.87*.0254*12
-    Pt3 = 0
-    while abs(Pt3_target-Pt3) > 1e-6:
-        find_cz(c2, Ts1, Pt2, w1, ct2, massflow, flowarea2, spool_speed1, spool_speed2, cp_gas, gminusg, R_gas)
-        c2 = rootfind.newton2(find_cz, c2, Ts1=Ts1, Pt2=Pt2, w1=w1, ct2=ct2, massflow=massflow,flowarea2=flowarea2, spool_speed1=spool_speed1, spool_speed2=spool_speed2, cp_gas=cp_gas, gminusg=gminusg, R_gas=R_gas)
-        unused, Tt2, densitys2 = find_cz(c2, Ts1, Pt2, w1, ct2, massflow, flowarea2, spool_speed1, spool_speed2, cp_gas, gminusg, R_gas)
-        Pt2s = Pt1*(Tt2/Tt1)**(1/gminusg)
-        pressureloss_rotor = loss_coeff_rotor*(0.5*densitys1*w1**2)
-        Pt2 = Pt2s - pressureloss_rotor
+    c1 = 200 # initial guess
+    Pt2 = 0 # initial
+    while abs(Pt2_target-Pt2) > 1e-6:
+        c1 = rootfind.newton2(find_cz, c1, Ts0=Ts0, Pt1=Pt1, w0=w0, ct1=ct1, massflow=massflow,flowarea1=flowarea1, spool_speed1=spool_speed1, spool_speed2=spool_speed2, cp_gas=cp_gas, gminusg=gminusg, R_gas=R_gas)
+        unused, Tt1, densitys2 = find_cz(c1, Ts0, Pt1, w0, ct1, massflow, flowarea1, spool_speed1, spool_speed2, cp_gas, gminusg, R_gas)
+        Pt1s = Pt0*(Tt1/Tt0)**(1/gminusg)
+        pressureloss_rotor = loss_coeff_rotor*(0.5*densitys0*w0**2)
+        Pt1 = Pt1s - pressureloss_rotor
 
-        pressureloss_stator = loss_coeff_stator*(0.5*densitys2*c2**2)
-        Pt3 = Pt2 - pressureloss_stator
-        Tt3 = Tt3*(Pt3/Pt3_target)**-gminusg
-        work = cp_gas*(Tt3-Tt1)
-        ct2 = work/spool_speed2
+        pressureloss_stator = loss_coeff_stator*(0.5*densitys2*c1**2)
+        Pt2 = Pt1 - pressureloss_stator
+        Tt2 = Tt2*(Pt2/Pt2_target)**-gminusg
+        work = cp_gas*(Tt2-Tt0)
+        ct1 = work/spool_speed2
+    '''Add in reaction and stage efficiency calculations'''
+
 
 def airfoil_count():
+    """NEED TO GENERALIZE THIS FUNCTION"""
     rotor_solidity = 1.3 # chord/spacing
     rotor_pitch_diam = 20.75 * .0254
     rotoR_gasfoil_width = 3.56 *.0254
@@ -382,8 +404,44 @@ def airfoil_count():
     
     return num_airfoils
 
+def combustor(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch_diam:float, flow_split:float, passage_vel:float, min_diam_casing:float, max_diam_casing:float, max_dome_vel:float, comblendomeheight:float, fuelflow:float, LHV:float, length_height:float, wall_angle:float, height_turbine_inlet:float, gamma:float=1.4, R_gas:float=287.05):
+    """
+    Notes
+    -----
+    Design of an annular combustor using spacerate
+    Spacerate is a concept used a GE, and is heat released per second per volume. If the space rate is too small there is not enough heat released in the combustor volume and combustion will spill over to the turbine
+    Station numbering coincides with overall engine numbering
+ 
+    Returns
+    -------
+    0: num_nozzles
+    1: diam_inner_casing
+    2: diam_outer_casing
+    3: diam_inner_pass
+    
+    Parameters
+    ----------
+    Tt31 : 
+    Pt31 : 
+    airflow : mass flow rate of the air
+    ref_vel : 
+    pitch_diam : pitch diameter of the annulus
+    flow_split : fraction of the air that is to be split above, inside, and below the combustor
+    passage_vel : desired velocity of the passages above and below the combustor
+    min_diam_casing : 
+    max_diam_casing : 
+    max_dome_vel : 
+    comblendomeheight : 
+    fuelflow : mass flow rate of the fuel
+    LHV : lower heating value of the fuel
+    length_height : ratio of the length to height of the pre-diffuser
+    wall_angle : half angle of the pre-diffuser
+    height_turbine_inlet : 
 
-def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, max_dome_vel, comblendomeheight, fuelflow, LHV, length_height, wall_angle, height_turbine_inlet, gamma=1.4, R_gas=287.05):
+    Assumptions
+    -----------
+    0:
+    """
     rhot31 = Pt31/R_gas/Tt31
     ref_area = airflow/rhot31/ref_vel
     ref_height = ref_area/np.pi/pitch_diam
@@ -415,7 +473,7 @@ def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel,
     comb_vol = (area_entr+area_exit)*np.pi*pitch_diam*comb_length
 
     fuel_air = fuelflow/airflow
-    airflow_lb = convert_mass(airflow, 'lbm')
+    airflow_lb = units.convert_mass(airflow, 'lbm')
     Ps31_atm = Pt31/101300
     comb_vol_ft3 = comb_vol/(.0254*12)**3
     space_rate = 3600*fuel_air*airflow_lb*LHV/Ps31_atm/comb_vol_ft3
@@ -437,12 +495,12 @@ def combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel,
 
 
 def assignment5(dfConfigs, R_gas=287.05):
-    Tt0 = convert_temps(dfConfigs['Config 1'].loc['0 Freestream', 'Total Temperature (R)'], 'SI')
-    Pt0 = convert_pressures(dfConfigs['Config 1'].loc['0 Freestream', 'Total Pressure (psia)'], 'SI')
-    Ts0 = convert_temps(dfConfigs['Config 1'].loc['0 Freestream', 'Static Temperature (R)'], 'SI')
-    Ps0 = convert_pressures(dfConfigs['Config 1'].loc['0 Freestream', 'Static Pressure (psia)'], 'SI')
-    Ts1 = convert_temps(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Temperature (R)'], 'SI')
-    Ps1 = convert_pressures(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Pressure (psia)'], 'SI')
+    Tt0 = units.convert_temperature(dfConfigs['Config 1'].loc['0 Freestream', 'Total Temperature (R)'], 'K')
+    Pt0 = units.convert_pressure(dfConfigs['Config 1'].loc['0 Freestream', 'Total Pressure (psia)'], 'Pa')
+    Ts0 = units.convert_temperature(dfConfigs['Config 1'].loc['0 Freestream', 'Static Temperature (R)'], 'K')
+    Ps0 = units.convert_pressure(dfConfigs['Config 1'].loc['0 Freestream', 'Static Pressure (psia)'], 'Pa')
+    Ts1 = units.convert_temperature(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Temperature (R)'], 'K')
+    Ps1 = units.convert_pressure(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Pressure (psia)'], 'Pa')
 
     '''Inlet Design'''
     density0 = Ps0/(R_gas*Ts0)
@@ -475,13 +533,13 @@ def assignment6():
     max_tip_diam = 29.58 # in
     max_tip_speed = 1500 # ft/s
 
-    Tt2, Tt31 = convert_temps([Tt2, Tt31], 'SI')
-    Pt2, Pt31 = convert_pressures([Pt2, Pt31], 'SI')
+    Tt2, Tt31 = units.convert_temperature([Tt2, Tt31], 'K')
+    Pt2, Pt31 = units.convert_pressure([Pt2, Pt31], 'Pa')
     massflow2 = massflow2/2.205
     massflow31 = massflow31/2.205
     max_tip_diam *= .0254 # m
     max_tip_speed *= 12*.0254 # m/s
-    total_work = convert_energy(total_work, 'SI') # J/(kg/s)
+    total_work = units.convert_energy(total_work, 'J') # J/(kg/s)
 
     return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
 
@@ -495,11 +553,11 @@ def assignment7():
     CPR = 8
     num_stages = 6
     stage_eff = 0.87
-    mach1 = .50245
+    mach0 = .50245
     spool_speed = 11619*2*np.pi/60
     pitch_diam1 = 20.71*.0254
     pitch_diam2 = 21.37*.0254
-    compressor_blade_design(Tt1, Pt1, mach1, massflow, flowarea2, CPR, num_stages, stage_eff, loss_coeff_rotor, loss_coeff_stator, spool_speed, pitch_diam1, pitch_diam2)
+    compressor_blade_design(Tt1, Pt1, mach0, massflow, flowarea2, CPR, num_stages, stage_eff, loss_coeff_rotor, loss_coeff_stator, spool_speed, pitch_diam1, pitch_diam2)
 
 
 def assignment8():
@@ -527,9 +585,9 @@ def assignment8():
     dome_vel_max = 80 # ft/sec
     comblendomeheight = 2.25 # ratio max = 2.5
     # Conversions
-    Tt31, Tt4 = convert_temps([Tt31, Tt4])
-    Pt31, Pt4 = convert_pressures([Pt31, Pt4])
-    airflow, fuelflow = convert_mass([airflow, fuelflow])
+    Tt31, Tt4 = units.convert_temperature([Tt31, Tt4])
+    Pt31, Pt4 = units.convert_pressure([Pt31, Pt4])
+    airflow, fuelflow = units.convert_mass([airflow, fuelflow])
     pitch_diam *= .0254
     tip_diam *=.0254
     max_diam_casing *= .0254
@@ -641,12 +699,12 @@ def assignment10():
     tip_diam = 32.55 # in
     hub_diam = 25.76 # in
     nozzle_coeff = .983
-    Tt4 = convert_temps(Tt4)
-    Pt4 = convert_pressures(Pt4)
-    Ps0 = convert_pressures(Ps0)
-    Pt49 = convert_pressures(Pt49)
-    massflow4 = convert_mass(massflow4)
-    work = convert_energy(work)
+    Tt4  = units.convert_temperature(Tt4)
+    Pt4  = units.convert_pressure(Pt4)
+    Ps0  = units.convert_pressure(Ps0)
+    Pt49 = units.convert_pressure(Pt49)
+    massflow4 = units.convert_mass(massflow4)
+    work = units.convert_energy(work)
     tip_diam = tip_diam *.0254
     hub_diam = hub_diam *.0254
     N *= 2*np.pi/60
