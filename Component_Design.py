@@ -459,7 +459,7 @@ def airfoil_count():
     
     return num_airfoils
 
-def combustor(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch_diam:float, flow_split:float, passage_vel:float, min_diam_casing:float, max_diam_casing:float, max_dome_vel:float, comblen_domeheight:float, fuelflow:float, LHV:float, length_height:float, wall_angle:float, height_turbine_inlet:float, gamma:float=1.4, R_gas:float=287.05):
+def combustor_design(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch_diam:float, flow_split:float, passage_vel:float, min_diam_casing:float, max_diam_casing:float, max_dome_vel:float, comblen_domeheight:float, fuelflow:float, LHV:float, length_height:float, wall_angle:float, height_turbine_inlet:float, gamma:float=1.4, R_gas:float=287.05):
     """
     Notes
     -----
@@ -697,7 +697,7 @@ def turbine_blade_design(Tt0, Pt0, Pt2, Pambient, mach2a, Cv, work, alpha2, mass
 
     return (reaction, (Tt0, Ts0, Ts1, Tt2, Ts2a), (Pt0, Ps0, Ps1, Pt2, Ps2), (alpha1, beta1, alpha2, beta2), (velocity0, velocity1u, velocity1z, velocity2z), (relvel1u, velocity1z, relvel2u, velocity2z), (mach0, mach1, mach2), (Astar, Aexit))
 
-def assignment5(dfConfigs, R_gas=287.05):
+def inlet_design_test_values(dfConfigs, R_gas=287.05):
     Tt0 = units.convert_temperature(dfConfigs['Config 1'].loc['0 Freestream', 'Total Temperature (R)'], 'K')
     Pt0 = units.convert_pressure(dfConfigs['Config 1'].loc['0 Freestream', 'Total Pressure (psia)'], 'Pa')
     Ts0 = units.convert_temperature(dfConfigs['Config 1'].loc['0 Freestream', 'Static Temperature (R)'], 'K')
@@ -718,7 +718,7 @@ def assignment5(dfConfigs, R_gas=287.05):
     diams, diff_length, diff_LH = inlet_design(density0, velocity0, massflow0, A0Ahl, throat_mach, Tt0, Pt0, fan_mach, diffuser_angle)
     return (diams/.0254, diff_length/.0254, diff_LH)
 
-def assignment6():
+def compressor_design_test_values():
     """Compressor Design"""
     Tt2 = 464.5 # R
     Pt2 = 6.58 # psia
@@ -746,7 +746,7 @@ def assignment6():
 
     return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
 
-def assignment7():
+def compressor_blade_design_test_values():
     Tt1 = 464.5 * 5/9
     Pt1 = 6.58 *6895
     massflow = 70.17 / 2.20462
@@ -762,7 +762,7 @@ def assignment7():
     pitch_diam2 = 21.37*.0254
     compressor_blade_design(Tt1, Pt1, mach0, massflow, flowarea2, CPR, num_stages, stage_eff, loss_coeff_rotor, loss_coeff_stator, spool_speed, pitch_diam1, pitch_diam2)
 
-def assignment8():
+def combustor_design_test_values():
     # Compressor parameters
     Tt31 = 897.1 # R
     Pt31 = 52.64 # psia
@@ -800,14 +800,14 @@ def assignment8():
     passage_vel *= .0254*12
     height_turbine_inlet *= .0254
 
-    result = combustor(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, dome_vel_max, comblendomeheight, fuelflow, LHV, lengthheight, wall_angle, height_turbine_inlet)
+    result = combustor_design(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, dome_vel_max, comblendomeheight, fuelflow, LHV, lengthheight, wall_angle, height_turbine_inlet)
     # print(result[0])
     # print(result[1:3]/.0254)
     # print(result[3:5]/.0254)
     # print(result[5:7]/.0254)
     # print(result[7:]/.0254)
    
-def assignment10():
+def turbine_blade_design_test_values():
     Ps0 = 4.364
     Tt4 = 2560 # R
     Pt4 = 50.04 # psia
@@ -847,4 +847,4 @@ def assignment10():
 
 
 if __name__ == '__main__':
-    assignment8()
+    combustor_design_test_values()
