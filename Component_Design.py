@@ -69,33 +69,6 @@ def _find_mach2(mach, massflow, densityt, Tt, flow_area, velocity_comp, gamma, R
     veclocity1zsq2 = (massflow/densitys1/flow_area)**2
     return (veclocity1zsq2 - cvelz1sq, np.sqrt(cvelz1sq))
 
-def _find_mach3(mach, Tt, velocity, gamma, R_gas):
-    """
-    Notes
-    -----
-    Find mach number from given total temperature and velocity
-    Mach number is the variable that is changing to converge get the mach numbers to match.
-    Function to be used with the newton2 solver in the RootFinding module.
-    Function iterates even though only one unknown is present because rearraning the equations is too complicated
-    
-    Returns
-    -------
-    0: difference between squared velocities calculated from mach number equations and from mass flow equations
-    1: velocity component
-    
-    Parameters
-    ----------
-    mach : mach number
-    Tt : total temperature
-    velocity : velocity the air should be
-
-    Assumptions
-    -----------
-    0: 
-    """
-    mach1 = velocity/np.sqrt(gamma*R_gas*isenf.static_temperature(mach, Tt))
-    return (mach1 - mach,)
-
 def _combustor_casing_calcs(Tt31, Pt31, airflow, ref_vel, pitch_diam, R_gas):
     """Calculations for determining casing values used in combustor function"""
 
@@ -235,8 +208,8 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
     highlight_diameter = np.sqrt(4*highlight_area/np.pi)
 
     '''Throat calcs'''
-    throat_static_temp  = isenf.T(mach_throat, Tt0)
-    throat_static_press = isenf.p(mach_throat, Pt0)
+    throat_static_temp  = isenf.static_temperature(mach_throat, Tt0)
+    throat_static_press = isenf.static_pressure(mach_throat, Pt0)
     speed_of_sound = np.sqrt(gamma*R_gas*throat_static_temp)
     throat_velocity = speed_of_sound*mach_throat
     throat_density = throat_static_press/(R_gas*throat_static_temp)
@@ -244,8 +217,8 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
     throat_diameter = np.sqrt(4*throat_area/np.pi)
 
     '''Compressor face or fan face calcs'''
-    fan_static_temp  = isenf.T(mach2, Tt0)
-    fan_static_press = isenf.p(mach2, Pt0)
+    fan_static_temp  = isenf.static_temperature(mach2, Tt0)
+    fan_static_press = isenf.static_pressure(mach2, Pt0)
     speed_of_sound = np.sqrt(gamma*R_gas*fan_static_temp)
     fan_velocity = speed_of_sound*mach2
     fan_density = fan_static_press/(R_gas*fan_static_temp)
@@ -303,11 +276,11 @@ def compressor_design(max_tip_diam:float, max_tip_speed:float, aspect_ratio:floa
 
     densityt2 = Pt2/(R_gas*Tt2)
 
-    Ts31 = isenf.T(mach31, Tt31)
+    Ts31 = isenf.static_temperature(mach31, Tt31)
 
     velocity31 = mach31*np.sqrt(gamma*R_gas*Ts31)
     densityt31 = Pt31/(R_gas*Tt31)
-    densitys31 = isenf.density(mach31, densityt31)
+    densitys31 = isenf.static_density(mach31, densityt31)
 
     inlet_blade_height = max_tip_diam/2*(1-inlet_radius_ratio)
     inlet_hub_radius = max_tip_diam/2*inlet_radius_ratio 
@@ -334,9 +307,9 @@ def compressor_design(max_tip_diam:float, max_tip_speed:float, aspect_ratio:floa
     compressor_length = 2*num_stages*avg_blade_width + (2*num_stages-1)*avg_gap # 6 rotors, 6 stators, 11 gaps in between all of the rotors and stators
 
     mach2 = rootfind.newton2(_find_mach, .469, massflow=massflow2, densityt=densityt2, Tt=Tt2, area=inlet_flow_area, gamma=gamma, R_gas=R_gas)
-    Ts2 = isenf.T(mach2, Tt2)
-    Ps2 = isenf.p(mach2, Pt2)
-    densitys2 = isenf.density(mach2, densityt2)
+    Ts2 = isenf.static_temperature(mach2, Tt2)
+    Ps2 = isenf.static_pressure(mach2, Pt2)
+    densitys2 = isenf.static_density(mach2, densityt2)
     velocity2 = mach2*np.sqrt(gamma*R_gas*Ts2)
     
     return ((inlet_hub_radius*2, outlet_hub_diam, avg_gap, avg_blade_height), spool_speed_rpm, num_stages, compressor_length)
