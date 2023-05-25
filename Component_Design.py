@@ -116,7 +116,7 @@ def _space_rate_calcs(Pt31, airflow, fuelflow, pitch_diam, LHV, comblen_domeheig
 
     return (space_rate, comb_length)
             
-def _find_cz(velc1:float, Ts0:float, Pt1:float, w0:float, ct1:float, massflow:float, flowarea1:float, spool_speed1:float, spool_speed2:float, cp_gas:float, gminusg:float, R_gas:float):
+def _find_cz(velc1:float, Ts0:float, Pt1:float, w0:float, velct1:float, massflow:float, flowarea1:float, spool_speed1:float, spool_speed2:float, cp_gas:float, gminusg:float, R_gas:float):
     """
     Notes
     -----
@@ -149,8 +149,8 @@ def _find_cz(velc1:float, Ts0:float, Pt1:float, w0:float, ct1:float, massflow:fl
     -----------
     0:
     """
-    cz1 = np.sqrt(velc1**2-ct1**2)
-    w1 = np.sqrt(cz1**2 + (ct1-spool_speed2)**2)
+    cz1 = np.sqrt(velc1**2-velct1**2)
+    w1 = np.sqrt(cz1**2 + (velct1-spool_speed2)**2)
     Ttr0 = Ts0  + w0**2/2/cp_gas
     Ttr1 = Ttr0 + (spool_speed2**2-spool_speed1**2)/2/cp_gas
     Ts1  = Ttr1 - w1**2/2/cp_gas
@@ -159,7 +159,7 @@ def _find_cz(velc1:float, Ts0:float, Pt1:float, w0:float, ct1:float, massflow:fl
     densitys1 = Ps1/R_gas/Ts1
     cz12 = massflow/densitys1/flowarea1
 
-    return (cz1 - cz12, Tt1, densitys1)
+    return (cz1 - cz12, Tt1, densitys1, Ts1)
 
 def _sonic_area_ratio(M, gamma=1.4):
     '''Returns A*/A from incident Mach number'''
@@ -168,7 +168,7 @@ def _sonic_area_ratio(M, gamma=1.4):
     AstarA = M*(top/bottom)**((gamma+1)/(2*(gamma-1)))
     return AstarA
 
-def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0AHL:float, mach_throat:float, Tt0:float, Pt0:float, mach2:float, diffuser_angle:float, gamma:float=1.4, R_gas:float=287.05):
+def inlet_design(Ts0, Ps0, mach0, massflow0, A0AHL:float, mach_throat:float, mach1:float, IPR:float, diffuser_angle:float, gamma:float=1.4, R_gas:float=287.05):
     """
     Notes
     -----
@@ -177,22 +177,24 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
     
     Returns
     -------
-    0: stream tube diameter, highlight diameter, throat diameter, fan diameter
+    Temperature pressures and mach numbers are length 3 arrays that list station 1, 2 values
+    0: diameters of streamtube highlight, throat diameter, and fan in an array
     1: diffuser length
     2: diffuser length to throat diameter ratio
-    
+    3: static temperatures
+    4: total temperatures
+    5: static pressures
+    6: total pressures
+    7: mach numbers
+
     Parameters
     ----------
-    stream_density  : density of the freestream
-    stream_velocity : velocity of the freestream relative to the inlet
-    massflow : asd
+    Ts0 : static temperature of the freestream
+    Ps0 : static pressure of the freestream
+    massflow0 : mass flow rate going into the inlet
     A0AHL : ratio of the area of the freestream tube to the area of the inlet highlight
     mach_throat : mach number at the throat of the inlet
-    Tt0 : total temperature of the freestream
-    Pt0 : total pressure of the freestream
-    Ts1 : asd
-    Ps1 : asd
-    mach2 : mach number at the compressor or fan face
+    mach1 : mach number at the compressor or fan face
     diffuser_angle : full angle of the diffuser that starts at the inlet throat and ends at the compressor or fan face
 
     Assumptions
@@ -201,36 +203,54 @@ def inlet_design(stream_density:float, stream_velocity:float, massflow:float, A0
     1: The diffuser is a frustum of a cone
     """
     
-    '''Entrance calcs'''
-    streamtube_area = massflow/(stream_velocity*stream_density)
+    # Freestream
+    densitys0 = Ps0/R_gas/Ts0
+    Tt0 = isenf.total_temperature(mach0, Ts0)
+    Pt0 = isenf.total_pressure(mach0, Ps0)
+    velocity0 = mach0*np.sqrt(gamma*R_gas*Ts0)
+    streamtube_area = massflow0/(velocity0*densitys0)
     streamtube_diameter = np.sqrt(4*streamtube_area/np.pi)
+
+    # Higlight
     highlight_area = streamtube_area/A0AHL
     highlight_diameter = np.sqrt(4*highlight_area/np.pi)
 
-    '''Throat calcs'''
+    # Throat
     throat_static_temp  = isenf.static_temperature(mach_throat, Tt0)
     throat_static_press = isenf.static_pressure(mach_throat, Pt0)
     speed_of_sound = np.sqrt(gamma*R_gas*throat_static_temp)
     throat_velocity = speed_of_sound*mach_throat
     throat_density = throat_static_press/(R_gas*throat_static_temp)
-    throat_area = massflow/(throat_velocity*throat_density)
+    throat_area = massflow0/(throat_velocity*throat_density)
     throat_diameter = np.sqrt(4*throat_area/np.pi)
 
-    '''Compressor face or fan face calcs'''
-    fan_static_temp  = isenf.static_temperature(mach2, Tt0)
-    fan_static_press = isenf.static_pressure(mach2, Pt0)
+    # Compressor or fan face
+    fan_static_temp  = isenf.static_temperature(mach1, Tt0)
+    fan_static_press = isenf.static_pressure(mach1, Pt0)
     speed_of_sound = np.sqrt(gamma*R_gas*fan_static_temp)
-    fan_velocity = speed_of_sound*mach2
+    fan_velocity = speed_of_sound*mach1
     fan_density = fan_static_press/(R_gas*fan_static_temp)
-    fan_area = massflow/(fan_velocity*fan_density)
+    fan_area = massflow0/(fan_velocity*fan_density)
     fan_diameter = np.sqrt(4*fan_area/np.pi)
 
-    '''Diffuser length calcs'''
+    # Diffuser
     throat_radius = throat_diameter/2
     fan_radius = fan_diameter/2
     diffuser_length = (fan_radius-throat_radius)/np.tan(diffuser_angle*np.pi/180)
+    
+    Pt1 = Pt0*IPR
+    Ps1 = isenf.static_pressure(mach1, Pt1)
+    Tt1 = Tt0
+    Ts1 = isenf.static_temperature(mach1, Tt1)
 
-    return np.array([streamtube_diameter, highlight_diameter, throat_diameter, fan_diameter]), diffuser_length, diffuser_length/throat_diameter
+    static_temperatures = np.array([Ts0, Ts1])
+    total_temperatures = np.array([Tt0, Tt1])
+    static_pressures = np.array([Ps0, Ps1])
+    total_pressures = np.array([Pt0, Pt1])
+    mach_numbers = np.array([mach0, mach1])
+    diameters = np.array([streamtube_diameter, highlight_diameter, throat_diameter, fan_diameter])
+
+    return (diameters, diffuser_length, diffuser_length/throat_diameter, static_temperatures, total_temperatures, static_pressures, total_pressures, mach_numbers)
 
 def compressor_design(max_tip_diam:float, max_tip_speed:float, aspect_ratio:float, work_coeff:float, total_work:float, inlet_radius_ratio:float, Tt2:float, Pt2:float, massflow2:float, Tt31:float, Pt31:float, massflow31:float, mach31:float, gamma:float=1.4, R_gas:float=287.05):
     """
@@ -242,10 +262,16 @@ def compressor_design(max_tip_diam:float, max_tip_speed:float, aspect_ratio:floa
     
     Returns
     -------
-    0: inlet hub diameter, outlet hub diameter, average gap between blades, average blade height
-    1: spool_speed_rpm
-    2: num_stages
-    3: compressor_length
+    Temperature pressures and mach numbers are length 3 arrays that list station 2, 3, 3.1 values
+    0: angular velocity of spool
+    1: number of stages
+    2: length of compressor
+    3: array of avgerage gap, avgerage blade height, avgerage blade width, inlet hub diameter, outlet hub diameter
+    4: static temperatures
+    5: total temperatures
+    6: static pressures
+    7: total pressures
+    8: mach numbers
     
     Parameters
     ----------
@@ -277,7 +303,6 @@ def compressor_design(max_tip_diam:float, max_tip_speed:float, aspect_ratio:floa
     densityt2 = Pt2/(R_gas*Tt2)
 
     Ts31 = isenf.static_temperature(mach31, Tt31)
-
     velocity31 = mach31*np.sqrt(gamma*R_gas*Ts31)
     densityt31 = Pt31/(R_gas*Tt31)
     densitys31 = isenf.static_density(mach31, densityt31)
@@ -305,14 +330,27 @@ def compressor_design(max_tip_diam:float, max_tip_speed:float, aspect_ratio:floa
     num_stages = total_work/stage_work
     num_stages = np.ceil(num_stages)
     compressor_length = 2*num_stages*avg_blade_width + (2*num_stages-1)*avg_gap # 6 rotors, 6 stators, 11 gaps in between all of the rotors and stators
-
+    
     mach2 = rootfind.newton2(_find_mach, .469, massflow=massflow2, densityt=densityt2, Tt=Tt2, area=inlet_flow_area, gamma=gamma, R_gas=R_gas)
     Ts2 = isenf.static_temperature(mach2, Tt2)
     Ps2 = isenf.static_pressure(mach2, Pt2)
     densitys2 = isenf.static_density(mach2, densityt2)
     velocity2 = mach2*np.sqrt(gamma*R_gas*Ts2)
     
-    return ((inlet_hub_radius*2, outlet_hub_diam, avg_gap, avg_blade_height), spool_speed_rpm, num_stages, compressor_length)
+    Ts3 = Ts31
+    Tt3 = Tt31
+    Ps31 = isenf.static_pressure(mach31, Pt31)
+    Ps3 = Ps31
+    Pt3 = Pt31
+    mach3 = mach31
+    static_temperatures = np.array([Ts2, Ts3, Ts31])
+    total_temperatures = np.array([Tt2, Tt3, Tt31])
+    static_pressures = np.array([Ps2, Ps3, Ps31])
+    total_pressures = np.array([Pt2, Pt3, Pt31])
+    mach_numbers = np.array([mach2, mach3, mach31])
+    blades_values = np.array([avg_gap, avg_blade_height, avg_blade_width, inlet_hub_radius*2, outlet_hub_diam])
+
+    return (spool_speed_rpm, num_stages, compressor_length, blades_values, static_temperatures, total_temperatures, static_pressures, total_pressures, mach_numbers)
 
 def compressor_blade_design(Tt0:float, Pt0:float, mach0:float, massflow:float, flowarea1:float, CPR:float, num_stages:float, stage_eff:float, loss_coeff_rotor:float, loss_coeff_stator:float, spool_speed:float, pitch_diam1:float, pitch_diam2:float, gamma:float=1.4, R_gas:float=287.05):
     """
@@ -366,30 +404,72 @@ def compressor_blade_design(Tt0:float, Pt0:float, mach0:float, massflow:float, f
     sound_speed1 = np.sqrt(gamma*R_gas*Ts0)
     velc0 = mach0*sound_speed1
     wvel0 = np.sqrt(velc0**2 + spool_speed1**2)
-    # Targets
+    # Targets for design
     stage_press_ratio = CPR**(1/num_stages)
     stage_temp_ratio = 1 + 1/stage_eff*(stage_press_ratio**gminusg-1)
+    work = cp_gas*Tt0*(stage_temp_ratio-1)
+    velct1 = work/spool_speed2
+
     Tt2 = Tt0*stage_temp_ratio
     Pt2_target = Pt0*stage_press_ratio
     Pt1 = Pt2_target
-    work = cp_gas*Tt0*(stage_temp_ratio-1)
-    velct1 = work/spool_speed2
+    
     # Iterating cz1 before stator and checking if total pressure after stator matches 
-    cvel1 = 200 # initial guess
+    velc1 = 522.87*.0254*12 # initial guess
     Pt2 = 0 # initial
     while abs(Pt2_target-Pt2) > 1e-6:
-        cvel1 = rootfind.newton2(_find_cz, cvel1, Ts0=Ts0, Pt1=Pt1, w0=wvel0, velct1=velct1, massflow=massflow,flowarea1=flowarea1, spool_speed1=spool_speed1, spool_speed2=spool_speed2, cp_gas=cp_gas, gminusg=gminusg, R_gas=R_gas)
-        unused, Tt1, densitys2 = _find_cz(cvel1, Ts0, Pt1, wvel0, velct1, massflow, flowarea1, spool_speed1, spool_speed2, cp_gas, gminusg, R_gas)
-        Pt1s = Pt0*(Tt1/Tt0)**(1/gminusg)
+        velc1 = rootfind.newton2(_find_cz, velc1, Ts0=Ts0, Pt1=Pt1, w0=wvel0, velct1=velct1, massflow=massflow,flowarea1=flowarea1, spool_speed1=spool_speed1, spool_speed2=spool_speed2, cp_gas=cp_gas, gminusg=gminusg, R_gas=R_gas)
+        
+        unused, Tt1, densitys1, Ts1 = _find_cz(velc1, Ts0, Pt1, wvel0, velct1, massflow, flowarea1, spool_speed1, spool_speed2, cp_gas, gminusg, R_gas)
+        
+        Pt1s = Pt0*(Tt1/Tt0)**(1/gminusg) # isentropic total pressure
         pressureloss_rotor = loss_coeff_rotor*(0.5*densitys0*wvel0**2)
         Pt1 = Pt1s - pressureloss_rotor
-
-        pressureloss_stator = loss_coeff_stator*(0.5*densitys2*cvel1**2)
+        pressureloss_stator = loss_coeff_stator*(0.5*densitys1*velc1**2)
         Pt2 = Pt1 - pressureloss_stator
+
         Tt2 = Tt2*(Pt2/Pt2_target)**-gminusg
         work = cp_gas*(Tt2-Tt0)
         velct1 = work/spool_speed2
-    '''Add in reaction and stage efficiency calculations'''
+
+    mach1 = velc1/np.sqrt(gamma*R_gas*Ts1)
+    Ps1 = isenf.static_pressure(mach1, Pt1)
+    densityt2 = Pt2/R_gas/Tt2
+    mach2 = rootfind.newton2(_find_mach, 0.1, massflow=massflow, densityt=densityt2, Tt=Tt2, area=flowarea1, gamma=gamma, R_gas=R_gas)
+    Ts2 = isenf.static_temperature(mach2, Tt2)
+    Ps2 = isenf.static_pressure(mach2, Pt2)
+    velc2 = mach2*np.sqrt(gamma*R_gas*Ts2)
+    reaction = (Ps1 - Ps0)/(Ps2 - Ps0)
+
+    stage_eff = ((Pt2/Pt0)**gminusg-1)/(Tt2/Tt0 - 1)
+
+    velcz1 = np.sqrt(velc1**2-velct1**2)
+    velwt1 = velct1 - spool_speed2
+    
+    alpha0 = 0
+    alpha1 = np.arctan(velct1/velcz1)
+    alpha2 = 0
+
+    beta0 = np.arctan(0/velc0)
+    beta1 = np.arctan(velwt1/velcz1)
+    beta2 = alpha2
+
+    static_temperatures = np.array([Ts0, Ts1, Ts2])
+    total_temperatures  = np.array([Tt0, Tt1, Tt2])
+    static_pressures    = np.array([Ps0, Ps1, Ps2])
+    total_pressures     = np.array([Pt0, Pt1, Pt2])
+
+    absolute_angles = np.array([alpha0, alpha1, alpha2])
+    relative_angles = np.array([beta0, beta1, beta2])
+
+    velw0 = velc0
+    velw1 = np.sqrt(velcz1**2+velwt1**2)
+    velw2 = velc2
+    absolute_velocities = np.array([velc0, velc1, velc2])
+    relative_velocities = np.array([velw0, velw1, velw2])
+    mach_numbers        = np.array([mach0, mach1, mach2])
+
+    return (reaction, stage_eff, static_temperatures, total_temperatures, static_pressures, total_pressures, absolute_angles, relative_angles, absolute_velocities, relative_velocities, mach_numbers)
 
 
 def airfoil_count():
@@ -633,7 +713,7 @@ def turbine_blade_design(Tt0, Pt0, Tt2, Pt2, work, alpha2, massflow, tip_diam, h
     # After stator
     velct1 = work/spool_speed1
     velwt1 = velct1 - spool_speed1
-    print('here-------------')
+
     mach1 = rootfind.newton2(_find_mach2, .9, massflow=massflow, densityt=densityt0, Tt=Tt0, flow_area=flow_area, velocity_comp=velct1, gamma=gamma_hot, R_gas=R_gas)
     unused, velcz1 = _find_mach2(mach1, massflow, densityt0, Tt0, flow_area, velct1, gamma=gamma_hot, R_gas=R_gas)
     alpha1 = np.arctan(velct1/velcz1)
@@ -642,7 +722,7 @@ def turbine_blade_design(Tt0, Pt0, Tt2, Pt2, work, alpha2, massflow, tip_diam, h
     velc1 = np.sqrt(gamma_hot*R_gas*Ts1)*mach1
     velcz1 = np.sqrt(velc1**2-velct1**2)
     beta1 = np.arctan(velwt1/velcz1)
-    print('here2----------')
+
     # After rotor
     densityt2 = Pt2/Tt2/R_gas
     mach2 = rootfind.newton2(_find_mach, .3, massflow=massflow, densityt=densityt2, Tt=Tt2, area=flow_area, gamma=gamma_hot, R_gas=R_gas)
@@ -729,26 +809,21 @@ def nozzle_design(Tt5:float, Pt5:float, flowarea5:float, Ps9:float, mach5:float,
 
     return (throat_diameter, exit_diameter, mach9, static_temperatures, total_temperatures, static_pressures, total_pressures)
 
-def inlet_design_test_values(dfConfigs, R_gas=287.05):
-    Tt0 = units.convert_temperature(dfConfigs['Config 1'].loc['0 Freestream', 'Total Temperature (R)'], 'K')
-    Pt0 = units.convert_pressure(dfConfigs['Config 1'].loc['0 Freestream', 'Total Pressure (psia)'], 'Pa')
-    Ts0 = units.convert_temperature(dfConfigs['Config 1'].loc['0 Freestream', 'Static Temperature (R)'], 'K')
-    Ps0 = units.convert_pressure(dfConfigs['Config 1'].loc['0 Freestream', 'Static Pressure (psia)'], 'Pa')
-    Ts1 = units.convert_temperature(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Temperature (R)'], 'K')
-    Ps1 = units.convert_pressure(dfConfigs['Config 1'].loc['1 Fan Inlet', 'Static Pressure (psia)'], 'Pa')
-
-    '''Inlet Design'''
-    density0 = Ps0/(R_gas*Ts0)
-    velocity0 = 795.5 # ft/s
-    velocity0 = velocity0 * 12*.0254
-    massflow0 = 70.17 # lbm/s
-    massflow0 = massflow0/2.205
+def inlet_design_test_values():
+    Ps0 = 4.36 # psia
+    Ts0 = 411.5 # R
+    mach0 = .8
+    massflow2 = 70.1 #lbm/s
     A0Ahl = .7
     throat_mach = .7
     fan_mach = .4
     diffuser_angle = 5
-    diams, diff_length, diff_LH = inlet_design(density0, velocity0, massflow0, A0Ahl, throat_mach, Tt0, Pt0, fan_mach, diffuser_angle)
-    return (diams/.0254, diff_length/.0254, diff_LH)
+    IPR = .99
+    massflow2 = units.convert_mass(massflow2)
+    Ps0 = Ps0*6895
+    Ts0 = Ts0*5/9
+
+    inlet_values = inlet_design(Ts0, Ps0, mach0, massflow2, A0Ahl, throat_mach, fan_mach, IPR, diffuser_angle)
 
 def compressor_design_test_values():
     """Compressor Design"""
@@ -776,9 +851,9 @@ def compressor_design_test_values():
     max_tip_speed *= 12*.0254 # m/s
     total_work = units.convert_energy(total_work, 'J') # J/(kg/s)
 
-    return compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
+    compressor_values = compressor_design(max_tip_diam, max_tip_speed, aspect_ratio, work_coeff, total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, Tt31, Pt31, massflow31, mach31)
 
-def compressor_blade_design_test_values():
+def compressor_blade_test_values():
     Tt1 = 464.5 * 5/9
     Pt1 = 6.58 *6895
     massflow = 70.17 / 2.20462
@@ -792,7 +867,7 @@ def compressor_blade_design_test_values():
     spool_speed = 11619*2*np.pi/60
     pitch_diam1 = 20.71*.0254
     pitch_diam2 = 21.37*.0254
-    compressor_blade_design(Tt1, Pt1, mach0, massflow, flowarea2, CPR, num_stages, stage_eff, loss_coeff_rotor, loss_coeff_stator, spool_speed, pitch_diam1, pitch_diam2)
+    compressor_blade_values = compressor_blade_design(Tt1, Pt1, mach0, massflow, flowarea2, CPR, num_stages, stage_eff, loss_coeff_rotor, loss_coeff_stator, spool_speed, pitch_diam1, pitch_diam2)
 
 def combustor_design_test_values():
     # Compressor parameters
@@ -832,12 +907,7 @@ def combustor_design_test_values():
     passage_vel *= .0254*12
     height_turbine_inlet *= .0254
 
-    result = combustor_design(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, dome_vel_max, comblendomeheight, fuelflow, LHV, lengthheight, wall_angle, height_turbine_inlet)
-    # print(result[0])
-    # print(result[1:3]/.0254)
-    # print(result[3:5]/.0254)
-    # print(result[5:7]/.0254)
-    # print(result[7:]/.0254)
+    combustor_values = combustor_design(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, dome_vel_max, comblendomeheight, fuelflow, LHV, lengthheight, wall_angle, height_turbine_inlet)
    
 def turbine_blade_test_values():
     Ps0 = 4.364
@@ -873,4 +943,10 @@ def turbine_blade_test_values():
     nozzle_values = nozzle_design(turbine_values[3][2], turbine_values[5][2], turbine_values[1], Ps0, turbine_values[10][2], nozzle_coeff, gamma_hot)
 
 if __name__ == '__main__':
+    inlet_design_test_values()
+    compressor_design_test_values()
+    compressor_blade_test_values()
+    combustor_design_test_values()
     turbine_blade_test_values()
+    
+
