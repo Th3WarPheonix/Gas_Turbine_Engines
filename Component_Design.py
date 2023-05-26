@@ -815,7 +815,7 @@ def inlet_design_test_values():
     mach0 = .8
     massflow2 = 70.1 #lbm/s
     A0Ahl = .7
-    throat_mach = .7
+    throat_mach = .7 # max is 0.75
     fan_mach = .4
     diffuser_angle = 5
     IPR = .99

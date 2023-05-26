@@ -32,6 +32,4 @@ if __name__ == '__main__':
     x1 = newton1(fcn1, dfcn1, x1=initx, precision=prec)
     x2 = newton2(fcn1, x1=initx, precision=prec)
     x3 = secant(fcn1, xn1=initx, precision=prec)
-    print(x1, x2, x3)
-
 
