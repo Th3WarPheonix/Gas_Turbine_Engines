@@ -129,6 +129,10 @@ def afterburner_pressure_loss(machi, drag_coeff, gammai, gammae, q=None, cpi=Non
     q : amount of heat released when fuel is combusted
     cpi : specific heat at constant pressure of exhuast entering afterburner
     Ti : temperature of exhaust entering afterburner
+
+    Assumptions
+    -----------
+    0: neglects fuel-air-ratio
     """
     giminus = gammai-1
     geminus = gammae-1
@@ -152,9 +156,11 @@ def afterburner_pressure_loss(machi, drag_coeff, gammai, gammae, q=None, cpi=Non
 
 def combustor_pressure_loss():
     """Notes
-    empirical relationsjip for total presure loss due to heat addition in a combustor"""
+    empirical relationship for total presure loss due to heat addition in a combustor"""
 
-    deltaPin = Ptin*0.53*machin**2*(0.95+.05*(Tt4/Tt31))
+    deltaPt = Ptin*0.53*machin**2*(0.95+.05*(Tt4/Tt31))
+
+    return deltaPt
 
 def main():
     machis = np.linspace(0.1, .5, 1000)
