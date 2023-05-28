@@ -12,8 +12,7 @@ def nacelle_area_ratio(mach0, mach1, area0area1, pressure_coeff, gamma:float=1.4
     The flow that does not enter the inlet accelerates as it flows around the outside of the cowl and if the cowl is too large the flow
     will become supersonic potentially inducing shock and increasing drag, similar to divergence drag on an airfoil.
 
-    Derivation on pages 375 and 376 of Aircraft Propulsion 3e is wrong for this equation in the spot noted 
-    in the comments, currently using incorrect version to verify rest of calculations
+    p375
     
     Returns
     -------
@@ -36,7 +35,7 @@ def nacelle_area_ratio(mach0, mach1, area0area1, pressure_coeff, gamma:float=1.4
     firsta = 1 + gminus/2*mach0**2
     firstb = 1 + gminus/2*mach1**2
 
-    first = mach1/mach0*np.sqrt(firsta/firstb)-1 # Books says firsta should be in the denominator
+    first = mach1/mach0*np.sqrt(firsta/firstb)-1
     first1 = 2*area0area1*first
 
     second = (firsta/firstb)**(1/gminusg) - 1
@@ -60,7 +59,7 @@ def pressure_coeff_crit(mach0, gamma=1.4):
 
     return pressure_coeff_crit
 
-def MachfromAreaRatio(M1, M0, A0A1, gamma):
+def mach_from_area_ratio(M1, M0, A0A1, gamma):
     """To be used with newton2 rootfind to determine the mach number to which the flow would be accelerated if it
     expereinced an area change from A0 to A1"""
     gminus = gamma-1
@@ -88,11 +87,11 @@ def additive_drag(mach0, mach1, gamma=1.4):
 
     return drag
 
-def pressure_recovery_supersonic_inlet(mach0, std='MIL'):
+def supersonic_pressure_recovery(mach0, std='MIL'):
     """
     Notes
     -----
-    Pressure recovery of supersonic inlets according to 1: military standard Mil-E_5008B and
+    Pressure recovery of supersonic inlets according to two empirical models 1: military standard Mil-E_5008B and
     2: AIA (Aircraft industries Association)
     Both standards are considered conservative (worst case pressure recovery) by todays standards
 
@@ -106,16 +105,60 @@ def pressure_recovery_supersonic_inlet(mach0, std='MIL'):
 
     return pressure_ratio
 
-def main():
-    mach0s = np.linspace(1, 5, 100)
-    prmil = np.empty_like(mach0s)
-    praia = np.empty_like(mach0s)
-    for i, m0 in enumerate(mach0s):
-        prmil[i] = pressure_recovery_supersonic_inlet(m0)
-        praia[i] = pressure_recovery_supersonic_inlet(m0, 'AIA')
+def afterburner_pressure_loss(machi, drag_coeff, gammai, gammae, q=None, cpi=None, Ti=None, mode='dry'):
+    """
+    Notes
+    -----
+    Total pressure loss in a constant area afterburner in either dry or wet afterburner
+    drag coefficient notes
+    subscripts i and e denote properties at entry and exit of afterburner
+    Derivation of equation 7.97 for mache^2 is wrong and should be mache^2 = ( A^2ge-2(ge-1)-A\sqrt((A^2+2)ge^2+2) )/(2-A^2)/(ge-1)/ge
+    where g is gamma, all other equations are correct for the derivation of Pte/Pti. Figure 7.32 of mache vs machi reflects the 
+    incorrect book equation, figure 7.31 cannot be replicated, figure 7.34 cannot be replicated and contradicts figure 7.31.
+    The code reflects the correct equation for mach2 presented here
+    p506
 
-    plt.plot(mach0s, prmil, label='mil')
-    plt.plot(mach0s, praia, label='aia')
+    Parameters
+    ----------
+    machi : mach number at beginning of afterburner
+    drag_coeff : drag coefficient of the flame holders
+    gammai : ratio of specific heats at beginning of afterburner
+    gammae : ratio of specific heats at exit of afterburner
+    dry : no fuel combusted in afterburner
+    wet : fuel combusted in afterburner
+    q : amount of heat released when fuel is combusted
+    cpi : specific heat at constant pressure of exhuast entering afterburner
+    Ti : temperature of exhaust entering afterburner
+    """
+    giminus = gammai-1
+    geminus = gammae-1
+    geminusg = geminus/gammae
+    giminusg = giminus/gammai
+
+    fourth = (1+gammai*machi**2*(1-drag_coeff/2))/gammai/machi
+    fifth = giminus/(1+giminus/2*machi**2)
+    if mode=='wet': eight = 1+q/cpi/Ti
+    else: eight = 1
+    third = fourth*np.sqrt(fifth/eight)
+
+    second = (2-third**2)*geminus*gammae
+    mache_sq = ( third**2*gammae-2*geminus-third*np.sqrt((third**2-2)*gammae**2+2) )/second
+
+    sixth = 1+gammai*machi**2*(1-drag_coeff/2)
+    seventh = 1+gammae*mache_sq
+    pressure_ratio = sixth/seventh*(1+geminus/2*mache_sq)**(1/geminusg)/(1+giminus/2*machi**2)**(1/giminusg)
+
+    return pressure_ratio
+
+def main():
+    machis = np.linspace(0.1, .5, 1000)
+    prs = np.empty_like(machis)
+    CD = 1.25
+    # print(afterburner_pressure_loss(0.25, CD, 1.33, 1.33, 1, 1, 1))
+    for i, machi in enumerate(machis):
+        prs[i] = afterburner_pressure_loss(machi, CD, 1.33, 1.33, 1, 1, 1)
+
+    plt.plot(machis, prs)
     plt.show()
 
 if __name__ == '__main__':
