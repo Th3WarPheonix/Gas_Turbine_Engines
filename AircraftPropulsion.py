@@ -150,6 +150,12 @@ def afterburner_pressure_loss(machi, drag_coeff, gammai, gammae, q=None, cpi=Non
 
     return pressure_ratio
 
+def combustor_pressure_loss():
+    """Notes
+    empirical relationsjip for total presure loss due to heat addition in a combustor"""
+
+    deltaPin = Ptin*0.53*machin**2*(0.95+.05*(Tt4/Tt31))
+
 def main():
     machis = np.linspace(0.1, .5, 1000)
     prs = np.empty_like(machis)
