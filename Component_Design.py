@@ -498,6 +498,10 @@ def airfoil_count(beta0:float, beta1:float, alpha1:float, alpha2:float, rotor_so
     max_thick : maximum thickness of the airfoils, given in percentage of chord both stator and rotor will use this value
     le_thick : thickness of the leading  edge of the airfoils given in percentage of chord both stator and rotor will use this value
     te_thick : thickness of the trailing edge of the airfoils given in percentage of chord both stator and rotor will use this value
+
+    Assumptions
+    -----------
+    0: does not consider under turning leaving trailing edge
     """
     rotor_solidity = 1.3 # chord/spacing
     rotor_diam = 20.75 * .0254
@@ -557,7 +561,7 @@ def combustor_design(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch
  
     Returns
     -------
-    0: number of fueal injectors
+    0: number of fuel injectors
     1: diameter of inner casing
     2: diameter of outer casing
     3: diameter of inner pass
