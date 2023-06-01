@@ -357,7 +357,7 @@ def compressor_blade_design(Tt0:float, Pt0:float, mach0:float, massflow:float, f
     Notes
     -----
     Calculations are acrosss one stage of a compressor and at the pitchline
-    Station numbering coincides with compressor stage numbering: 1 before rotor, 2 between rotor and stator, 3 after stator
+    Station numbering coincides with compressor stage numbering: 0 before rotor, 1 between rotor and stator, 2 after stator
     Velocity representation
     c : absolute velocity
     w : relative to the rotor
@@ -471,43 +471,77 @@ def compressor_blade_design(Tt0:float, Pt0:float, mach0:float, massflow:float, f
 
     return (reaction, stage_eff, static_temperatures, total_temperatures, static_pressures, total_pressures, absolute_angles, relative_angles, absolute_velocities, relative_velocities, mach_numbers)
 
+def airfoil_count(beta0:float, beta1:float, alpha1:float, alpha2:float, rotor_solidity:float, rotor_diam:float, rotor_width:float, stator_solidity:float, stator_diam:float, stator_width:float, max_thick:float, le_thick:float, te_thick:float):
+    """
+    Notes
+    -----
+    Calculates how many airfoils are needed based on compressor design calculations and user defined design targets.
+    Station numbering coincides with compressor stage numbering: 0 before rotor, 1 between rotor and stator, 2 after stator
 
-def airfoil_count():
-    """NEED TO GENERALIZE THIS FUNCTION"""
+    Returns
+    -------
+    0: number of rotor  airfoils
+    1: number of stator airfoils
+
+    Parameters
+    ----------
+    beta0 : angle between flow entering rotor and centerline of engine
+    beta1 : angle between flow exiting  rotor and centerline of engine
+    alpha1 : angle between flow entering stator and centerline of engine
+    alpha2 : angle between flow entering stator and centerline of engine
+    rotor_solidity : ratio of rotor chord to rotor spacing
+    rotor_diam : diameter at which the rotor properties exist
+    rotor_width : width of the rotor when measured parallel to the engine
+    stator_solidity : ratio of stator chord to stator spacing
+    stator_diam : diameter at which the stator properties exist
+    stator_width : width of the stator when measured parallel to the engine
+    max_thick : maximum thickness of the airfoils, given in percentage of chord both stator and rotor will use this value
+    le_thick : thickness of the leading  edge of the airfoils given in percentage of chord both stator and rotor will use this value
+    te_thick : thickness of the trailing edge of the airfoils given in percentage of chord both stator and rotor will use this value
+    """
     rotor_solidity = 1.3 # chord/spacing
-    rotor_pitch_diam = 20.75 * .0254
-    rotoR_gasfoil_width = 3.56 *.0254
+    rotor_diam = 20.75 * .0254
+    rotor_width = 3.56 *.0254
 
     stator_solidity = 1.2 # chord/spacing
-    stator_pitch_diam = 22*.0254  
-    statoR_gasfoil_width = 3.3 *.0254
+    stator_diam = 22*.0254  
+    stator_width = 3.3 *.0254
 
     meanline_slope = 5.9 # deg
 
-    beta1 = -59.4*np.pi/180
-    beta2 = 43.3*np.pi/180
-    alpha2 = 25.2*np.pi/180
-    alpha3 = 0*np.pi/180
+    beta0 = -59.4*np.pi/180
+    beta1 = 43.3*np.pi/180
+    alpha1 = 25.2*np.pi/180
+    alpha2 = 0*np.pi/180
 
-    rotor_stagger_angle = (beta1 + beta2)/2
-    rotor_chord = rotoR_gasfoil_width/np.cos(rotor_stagger_angle)
+    rotor_stagger_angle = (beta0 + beta1)/2
+    rotor_chord = rotor_width/np.cos(rotor_stagger_angle)
     rotor_spacing = rotor_chord/rotor_solidity
-    rotor_num_airfoils  = np.ceil(np.pi*rotor_pitch_diam/rotor_spacing)
-    rotor_camber_angle = beta1 - beta2
+    rotor_num_airfoils  = np.ceil(np.pi*rotor_diam/rotor_spacing)
+    rotor_camber_angle = beta0 - beta1
 
-    stator_stagger_angle = (alpha2 + alpha3)/2
-    stator_chord = statoR_gasfoil_width/np.cos(stator_stagger_angle)
+    stator_stagger_angle = (alpha1 + alpha2)/2
+    stator_chord = stator_width/np.cos(stator_stagger_angle)
     stator_spacing = stator_chord/stator_solidity
-    stator_num_airfoils = np.ceil(np.pi*stator_pitch_diam/stator_spacing)
-    stator_camber_angle = alpha2 - alpha3
+    stator_num_airfoils = np.ceil(np.pi*stator_diam/stator_spacing)
+    stator_camber_angle = alpha1 - alpha2
 
-    print('alpha2, alpha3 deg \t', alpha2*180/np.pi, alpha3*180/np.pi)
+    num_airfoils = np.array([rotor_num_airfoils, stator_num_airfoils], dtype=int)
+    
+    stator_le_thick = le_thick*stator_chord
+    stator_te_thick = te_thick*stator_chord
+    stator_thick = max_thick*stator_chord
+
+    rotor_le_thick = le_thick*rotor_chord
+    rotor_te_thick = te_thick*rotor_chord
+    rotor_thick = max_thick*rotor_chord
+
+    print('alpha1, alpha2 deg \t', alpha1*180/np.pi, alpha2*180/np.pi)
     print('stator chord in \t{}'.format(stator_chord/.0254))
     print('leading edge thickness in \t{}'.format(.009*stator_chord/.0254))
     print('trailing edge thickness in \t{}'.format(.009*stator_chord/.0254))
     print('camber angle \t{}'.format(stator_camber_angle*180/np.pi))
     print('thickness in \t{}'.format(.05*stator_chord/.0254))
-    num_airfoils = np.array([rotor_num_airfoils, stator_num_airfoils], dtype=int)
     print(num_airfoils)
     
     return num_airfoils
