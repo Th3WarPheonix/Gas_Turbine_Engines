@@ -308,12 +308,11 @@ def compressor_design(max_tip_diam:float, max_tip_speed:float, aspect_ratio:floa
     densitys31 = isenf.static_density(mach31, densityt31)
 
     inlet_blade_height = max_tip_diam/2*(1-inlet_radius_ratio)
-    inlet_hub_radius = max_tip_diam/2*inlet_radius_ratio 
+    inlet_hub_radius = max_tip_diam/2*inlet_radius_ratio
     inlet_hub_area = np.pi*inlet_hub_radius**2
     inlet_flow_area = total_area - inlet_hub_area
 
-    outlet_flow_area = massflow31/(densitys31*velocity31)
-
+    outlet_flow_area = massflow31/(densitys31*velocity31) # area31
     outlet_hub_area = total_area - outlet_flow_area
     outlet_hub_diam = np.sqrt(outlet_hub_area*4/np.pi)
     outlet_blade_height = (max_tip_diam - outlet_hub_diam)/2
@@ -471,7 +470,7 @@ def compressor_blade_design(Tt0:float, Pt0:float, mach0:float, massflow:float, f
 
     return (reaction, stage_eff, static_temperatures, total_temperatures, static_pressures, total_pressures, absolute_angles, relative_angles, absolute_velocities, relative_velocities, mach_numbers)
 
-def airfoil_count(beta0:float, beta1:float, alpha1:float, alpha2:float, rotor_solidity:float, rotor_diam:float, rotor_width:float, stator_solidity:float, stator_diam:float, stator_width:float, max_thick:float, le_thick:float, te_thick:float):
+def airfoil_layout(beta0:float, beta1:float, alpha1:float, alpha2:float, rotor_solidity:float, rotor_diam:float, rotor_width:float, stator_solidity:float, stator_diam:float, stator_width:float, max_thick:float, le_thick:float, te_thick:float):
     """
     Notes
     -----
@@ -480,8 +479,11 @@ def airfoil_count(beta0:float, beta1:float, alpha1:float, alpha2:float, rotor_so
 
     Returns
     -------
-    0: number of rotor  airfoils
-    1: number of stator airfoils
+    0: number of airfoils
+    1: rotor values - chord, spacing, camber angle, stagger angle
+    2: stator values  - chord, spacing, camber angle, stagger angle
+    3: rotor thicknesses - leading edge radius, trailing edge radius, maximum thickness
+    4: stator thicknesses - leading edge radius trailing edge radius, maximum thickness
 
     Parameters
     ----------
@@ -503,21 +505,7 @@ def airfoil_count(beta0:float, beta1:float, alpha1:float, alpha2:float, rotor_so
     -----------
     0: does not consider under turning leaving trailing edge
     """
-    rotor_solidity = 1.3 # chord/spacing
-    rotor_diam = 20.75 * .0254
-    rotor_width = 3.56 *.0254
-
-    stator_solidity = 1.2 # chord/spacing
-    stator_diam = 22*.0254  
-    stator_width = 3.3 *.0254
-
-    meanline_slope = 5.9 # deg
-
-    beta0 = -59.4*np.pi/180
-    beta1 = 43.3*np.pi/180
-    alpha1 = 25.2*np.pi/180
-    alpha2 = 0*np.pi/180
-
+    
     rotor_stagger_angle = (beta0 + beta1)/2
     rotor_chord = rotor_width/np.cos(rotor_stagger_angle)
     rotor_spacing = rotor_chord/rotor_solidity
@@ -540,15 +528,12 @@ def airfoil_count(beta0:float, beta1:float, alpha1:float, alpha2:float, rotor_so
     rotor_te_thick = te_thick*rotor_chord
     rotor_thick = max_thick*rotor_chord
 
-    print('alpha1, alpha2 deg \t', alpha1*180/np.pi, alpha2*180/np.pi)
-    print('stator chord in \t{}'.format(stator_chord/.0254))
-    print('leading edge thickness in \t{}'.format(.009*stator_chord/.0254))
-    print('trailing edge thickness in \t{}'.format(.009*stator_chord/.0254))
-    print('camber angle \t{}'.format(stator_camber_angle*180/np.pi))
-    print('thickness in \t{}'.format(.05*stator_chord/.0254))
-    print(num_airfoils)
-    
-    return num_airfoils
+    rotor_values = np.array([rotor_chord, rotor_spacing, rotor_camber_angle, rotor_stagger_angle])
+    stator_values = np.array([stator_chord, stator_spacing, stator_camber_angle, stator_stagger_angle])
+    rotor_thicks = np.array([rotor_le_thick, rotor_te_thick, rotor_thick])
+    stator_thicks = np.array([stator_le_thick, stator_te_thick, stator_thick])
+
+    return np.array([num_airfoils, rotor_values, stator_values, rotor_thicks, stator_thicks])
 
 def combustor_design(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch_diam:float, flow_split:float, passage_vel:float, min_diam_casing:float, max_diam_casing:float, max_dome_vel:float, comblen_domeheight:float, fuelflow:float, LHV:float, length_height:float, wall_angle:float, height_turbine_inlet:float, gamma:float=1.4, R_gas:float=287.05):
     """
@@ -570,10 +555,10 @@ def combustor_design(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch
     6: inlet prediffuser length
     7: inlet prediffuser height
     8: reference height
-    9: dome height
-    10: height inner passage
-    11: height outer passage
-    
+    9: velocity of air in dome
+    10: dome height
+    11: spacerate
+
     Parameters
     ----------
     Tt31 : total tempearture entering prediffuser
@@ -654,7 +639,6 @@ def combustor_design(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch
         else:
             spacerate = True
 
-    dome_height_set = None
     while spacerate is False:
         space_rate, comb_length = _space_rate_calcs(Pt31, airflow, fuelflow, pitch_diam, LHV, comblen_domeheight, height_turbine_inlet, dome_height)
 
@@ -663,13 +647,11 @@ def combustor_design(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch
             dome_vel -= 1*.0254*12
             dome_area = flow_split*airflow/rhot31/dome_vel
             dome_height = dome_area/np.pi/pitch_diam
-            dome_height_set = dome_height
         elif space_rate < 8e6:
             # Volume is too large so the dome velocity needs to be increased which changes the dome height which decreases combustor volume
             dome_vel += 1
             dome_area = flow_split*airflow/rhot31/dome_vel
             dome_height = dome_area/np.pi/pitch_diam
-            dome_height_set = dome_height
             if dome_vel > max_dome_vel:
                 print('ERROR: Dome velocity exceeded maximum and space rate is too low ')
                 break
@@ -684,7 +666,7 @@ def combustor_design(Tt31:float, Pt31:float, airflow:float, ref_vel:float, pitch
     circumference = np.pi*pitch_diam
     num_nozzles = np.ceil(circumference/dome_height)
 
-    return np.array((num_nozzles, diam_inner_casing, diam_outer_casing, diam_inner_pass, diam_outer_pass, comb_length, inlet_length, inlet_height, ref_height, dome_height))
+    return np.array([num_nozzles, diam_inner_casing, diam_outer_casing, diam_inner_pass, diam_outer_pass, comb_length, inlet_length, inlet_height, ref_height, dome_vel, dome_height, space_rate])
 
 def turbine_blade_design(Tt0, Pt0, Tt2, Pt2, work, alpha2, massflow, tip_diam, hub_diam, spool_speed, stage_eff, gamma_hot, gamma_cold=1.4, R_gas=287.05):
     """
@@ -905,7 +887,28 @@ def compressor_blade_test_values():
     spool_speed = 11619*2*np.pi/60
     pitch_diam1 = 20.71*.0254
     pitch_diam2 = 21.37*.0254
+
     compressor_blade_values = compressor_blade_design(Tt1, Pt1, mach0, massflow, flowarea2, CPR, num_stages, stage_eff, loss_coeff_rotor, loss_coeff_stator, spool_speed, pitch_diam1, pitch_diam2)
+
+    rotor_solidity = 1.3 # chord/spacing
+    rotor_diam = 20.75 * .0254
+    rotor_width = 3.56 *.0254
+
+    stator_solidity = 1.2 # chord/spacing
+    stator_diam = 22*.0254  
+    stator_width = 3.3 *.0254
+
+    meanline_slope = 5.9 # deg
+    max_thick = .05
+    le_thick = .009
+    te_thick = .009
+
+    beta0 = -59.4*np.pi/180
+    beta1 = 43.3*np.pi/180
+    alpha1 = 25.2*np.pi/180
+    alpha2 = 0*np.pi/180
+
+    airfoil_layout(beta0, beta1, alpha1, alpha2, rotor_solidity, rotor_diam, rotor_width, stator_solidity, stator_diam, stator_width, max_thick, le_thick, te_thick)
 
 def combustor_design_test_values():
     # Compressor parameters
@@ -946,6 +949,8 @@ def combustor_design_test_values():
     height_turbine_inlet *= .0254
 
     combustor_values = combustor_design(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, passage_vel, min_diam_casing, max_diam_casing, dome_vel_max, comblendomeheight, fuelflow, LHV, lengthheight, wall_angle, height_turbine_inlet)
+    
+    return combustor_values
    
 def turbine_blade_test_values():
     Ps0 = 4.364
@@ -981,10 +986,10 @@ def turbine_blade_test_values():
     nozzle_values = nozzle_design(turbine_values[3][2], turbine_values[5][2], turbine_values[1], Ps0, turbine_values[10][2], nozzle_coeff, gamma_hot)
 
 if __name__ == '__main__':
-    inlet_design_test_values()
-    compressor_design_test_values()
-    compressor_blade_test_values()
+    # inlet_design_test_values()
+    # compressor_design_test_values()
+    # compressor_blade_test_values()
     combustor_design_test_values()
-    turbine_blade_test_values()
+    # turbine_blade_test_values()
     
 
