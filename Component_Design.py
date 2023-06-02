@@ -385,13 +385,12 @@ def nacelle_design(mach0, mach1, area0area1, pressure_coeff, gamma:float=1.4):
 
     return areamax_area1
 
-
 def supersonic_pressure_recovery(mach0, std='MIL'):
     """
     Notes
     -----
     Pressure recovery of supersonic inlets according to two empirical models 1: military standard Mil-E_5008B and
-    2: AIA (Aircraft industries Association)
+    2: AIA (Aircraft industries Association). Both methods are for above mach 1. Mil standard is piecewise mach 1-5 and 5+
     Both standards are considered conservative (worst case pressure recovery) by todays standards
     p402
     
