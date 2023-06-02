@@ -130,6 +130,10 @@ def additive_drag(mach0:float, mach1:float, gamma=1.4):
     -----
     Calculates the inlet additive drag due to air intake obstructing the flow
 
+    Returns
+    -------
+    drag
+
     p378"""
     gminus  = gamma-1
     gplus   = gamma+1
