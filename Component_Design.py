@@ -1063,6 +1063,7 @@ def nozzle_design(Tt5:float, Pt5:float, flowarea5:float, Ps9:float, mach5:float,
     Assumptions
     -----------
     0: perfectly matched pressure conditions
+    1: does not correct geometrical throat area to effective throat area
     """  
     cp_hot = gamma_hot*R_gas/(gamma_hot-1)
     gminus = gamma_hot - 1
