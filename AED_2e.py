@@ -4,7 +4,7 @@ from ambiance import Atmosphere as atmos
 import Unit_Conversions as units
 import matplotlib.pyplot as plt
 
-def get_norm_props(altitude):
+def get_atmos(altitude):
     """Altitude in feet
     
     Returns
@@ -16,6 +16,21 @@ def get_norm_props(altitude):
     delta = atmos(altitude*.0254*12).pressure[0]/101325
 
     return (theta, delta)
+
+def get_dyn_press(alt, mach, gamma=1.4):
+    """
+    Returns
+    -------
+    dynamic pressure in Pascals
+
+    Parameters
+    ----------
+    alt : altitude in feet
+    """
+
+    theta, delta = get_atmos(alt)
+    return delta*101325*mach**2*gamma/2
+
 
 def drag_polar(mach0, aspect_ratio=0, eccentricity=0, Kdprime=0, CLmin=0):
     """
@@ -72,8 +87,8 @@ def engine_thrust_lapse(throttle_ratio, mach0, engine_type, alt=30, mode=0, gamm
         theta = 1.0796
         delta = .9298
     else:
-        theta = get_norm_props(alt*1000)[0]
-        delta = get_norm_props(alt*1000)[1]
+        theta = get_atmos(alt*1000)[0]
+        delta = get_atmos(alt*1000)[1]
 
     norm_Tt = theta*(1+(gamma-1)/2*mach0**2)
     norm_Pt = delta*(1+(gamma-1)/2*mach0**2)**(gamma/(gamma-1))
@@ -227,7 +242,7 @@ def main():
     dyn_press3 = units.convert_pressure(1128/144, 'Pa')
     dyn_press4 = units.convert_pressure(357/144, 'Pa')
     dyn_press5 = units.convert_pressure(634.6/144, 'Pa')
-    air_temp = get_norm_props(30000)[0]*288.15
+    air_temp = get_atmos(30000)[0]*288.15
     CD02 = .028
     CD03 = .028
     CD04 = .016
@@ -237,21 +252,24 @@ def main():
         alpha3 = engine_thrust_lapse(tr, mach3, 1, 30, 1)
         alpha4 = engine_thrust_lapse(tr, mach4, 1, 30, 1)
         alpha5 = engine_thrust_lapse(tr, 1.2, 1, 30, 1)
+        alpha7 = engine_thrust_lapse(tr, 1.8, 1, 40, 1)
 
         thrust_loading1 = thrust_loading_takeoff(wing_loading1, densitys, CLmax, CD, alpha1, beta1, mu, vel_ratio_to, takeoff_distance)
         thrust_loading2 = thrust_loading_cruise(wing_loading1, dyn_press2, CD02, K12, alpha2, beta2)
         thrust_loading3 = thrust_loading_turn(wing_loading1, load, dyn_press3, CD03, K13, alpha3, beta2)
         thrust_loading4 = thrust_loading_turn(wing_loading1, load, dyn_press4, CD04, K14, alpha4, beta2)
         thrust_loading5 = thrust_loading_horizontal_accel(wing_loading1, .8, 50, air_temp, dyn_press5, CD03, K15, alpha5, beta2)
-        thrust_loading6 = thrust_loading_landing(wing_loading1a, .002047, 2, .8123, .0005, .56, .18, 1.15, 1500, g0=32.17)
-        print(thrust_loading6)
+        thrust_loading6 = thrust_loading_landing(wing_loading1a, .002047, 2, .8123, 0, .56, .18, 1.15, 1500, g0=32.17)
+        thrust_loading7 = thrust_loading_cruise(wing_loading1a, 891.8, .028, .324, alpha7, .78)
+
         plt.plot(wing_loading1a, thrust_loading1, label="Takeoff", linestyle='--')
         plt.plot(wing_loading1a, thrust_loading2, label="Cruise", linestyle='--')
         plt.plot(wing_loading1a, thrust_loading3, label="Turn 1", linestyle='--')
         plt.plot(wing_loading1a, thrust_loading4, label="Turn 2", linestyle='--')
         plt.plot(wing_loading1a, thrust_loading5, label="Accel", linestyle='--')
-        plt.plot(wing_loading1a, thrust_loading6, label="Landing", linestyle='--')
-        # plt.vlines(thrust_loading6, .4, 1.6, label="Landing", linestyle='--')
+        # plt.plot(wing_loading1a, thrust_loading6, label="Landing", linestyle='--')
+        plt.vlines(thrust_loading6, .4, 1.6, label="Landing", linestyle='--')
+        plt.plot(wing_loading1a, thrust_loading7, label="Max Mach", linestyle='--')
 
     plt.legend()
     plt.ylim([.4, 1.6])
