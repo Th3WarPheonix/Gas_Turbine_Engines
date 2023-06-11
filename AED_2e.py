@@ -32,17 +32,18 @@ def get_dyn_press(alt, mach, gamma=1.4):
     return delta*101325*mach**2*gamma/2
 
 
-def drag_polar(mach0, aspect_ratio=0, eccentricity=0, Kdprime=0, CLmin=0):
+def drag_polar(mach0:int, CLmax, kto, K2=0):
     """
     Notes
     -----
     Calculate drag polar
     K1, K2, CD0 are assumed known
     high performance aircraft CLmin~=0 K2~=0
+    K2 = 0 for uncambered
     .001 <= K" <= .03
     .1 <= CLmin <= .3
     7 <= AR <= 10
-    .75 <= eccentricity <= .85
+    .75 <= efficiency <= .85
 
     Lift-drag polar breakdown
     CD = CDmin + K'C^2 + K"(CL - CLmin)^2
@@ -50,21 +51,37 @@ def drag_polar(mach0, aspect_ratio=0, eccentricity=0, Kdprime=0, CLmin=0):
     K1 = K' + K"
     K2 = -2K"CLmin
     CD0 = CDmin + K"Cmin^2
-    
+    K' = induced drag
+    K" = viscous drag
+    Kprime = 1/pi/aspect_ratio/efficiency
+
     Parameters
     ----------
-    Kprime = induced drag
-    Kdprime = viscous drag
+    
     """
 
-    Kprime = 1/np.pi/aspect_ratio/eccentricity
-    K1 = Kprime + Kdprime
-    K2 = -2*Kdprime*CLmin
-    CD0 = CDmin + Kdprime*CLmin**2
+    if 0 <= mach0 <= 1:
+        K1 = 0.18
+    elif 1 < mach0 <= 2:
+        K1 = (.18 - .36)/(1-2)*(mach0-1)+.18
+    else:
+        print("Flight mach number not in range for turbine engines")
 
+    if 0 <= mach0 <= 0.6:
+        CD0 = .014
+    elif  0.6 < mach0 <= 0.8:
+        CD0 = (.014 - .016)/(.6-.8)*(mach0-0.6)+.014
+    elif 0.8 < mach0 <= 1.2:
+        CD0 = (.016 - .026)/(.8-1.2)*(mach0-0.8)+.016
+    elif 1.2 < mach0 <= 1.4:
+        CD0 = (.026 - .028)/(1.2-1.4)*(mach0-1.2)+.026
+    elif 1.4 < mach0 <= 2:
+        CD0 = .028
+        
+    CL = CLmax/kto**2
     CD = K1*CL**2+K2*CL+CD0
 
-    return
+    return CD, CD0, K1
 
 def engine_thrust_lapse(throttle_ratio, mach0, engine_type, alt=30, mode=0, gamma=1.4):
     """
@@ -95,7 +112,8 @@ def engine_thrust_lapse(throttle_ratio, mach0, engine_type, alt=30, mode=0, gamm
 
     if norm_Tt <= throttle_ratio:
         zeta = 0
-    else:        zeta = 1
+    else:
+        zeta = 1
 
     match engine_type:
         case 0: # high bypass turbofan
