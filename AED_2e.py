@@ -92,7 +92,7 @@ def get_drag_polar(mach0:int, CLmax, vel_ratio=1.2, K2=0):
 
     return (CD0, K1, CD)
 
-def engine_thrust_lapse(throttle_ratio, mach0, engine_type, alt=30, mode=0, gamma=1.4):
+def get_thrust_lapse(throttle_ratio, mach0, engine_type, alt=30, mode=0, gamma=1.4):
     """
     Notes
     -----
@@ -145,7 +145,7 @@ def engine_thrust_lapse(throttle_ratio, mach0, engine_type, alt=30, mode=0, gamm
     
     return thrust_lapse
 
-def thrust_loading_takeoff(wing_loading, densitys, CLmax, mach, alpha, beta, friction_coeff, vel_ratio_to, takeoff_distance, rotation_time=3, CL=0, CDR=0, g0=9.81):
+def thrust_load_takeoff(wing_loading, densitys, CLmax, mach, alpha, beta, friction_coeff, vel_ratio_to, takeoff_distance, rotation_time=3, CL=0, CDR=0, g0=9.81):
     """
     Notes
     -----
@@ -171,7 +171,7 @@ def thrust_loading_takeoff(wing_loading, densitys, CLmax, mach, alpha, beta, fri
 
     return thrust_loading
 
-def thrust_loading_cruise(wing_loading, alt, mach, CLmax, alpha, beta, CDR=0, K2=0):
+def thrust_load_cruise(wing_loading, alt, mach, CLmax, alpha, beta, CDR=0, K2=0):
     """
     Notes
     -----
@@ -182,12 +182,11 @@ def thrust_loading_cruise(wing_loading, alt, mach, CLmax, alpha, beta, CDR=0, K2
     """
     dyn_press = get_dyn_press(alt, mach)
     CD0, K1, CD = get_drag_polar(mach, CLmax)
-    print(beta, alpha, alt, mach, units.convert_pressure(dyn_press, "psi")*144)
     thrust_loading = beta/alpha*(K1*beta/dyn_press*wing_loading + K2 + (CD0+CDR)/beta*dyn_press/wing_loading) 
 
     return thrust_loading
 
-def thrust_loading_turn(wing_loading, load_factor, alt, mach, CLmax, alpha, beta, CDR=0, K2=0):
+def thrust_load_turn(wing_loading, load_factor, alt, mach, CLmax, alpha, beta, CDR=0, K2=0):
     """
     Notes
     -----
@@ -205,7 +204,7 @@ def thrust_loading_turn(wing_loading, load_factor, alt, mach, CLmax, alpha, beta
 
     return thrust_loading
 
-def thrust_loading_horizontal_accel(wing_loading, deltamach, deltat, air_temp, alt, mach, CLmax, alpha, beta, CDR=0, K2=0, g0=9.81, gamma=1.4, R_gas=287.05):
+def thrust_load_horizontal_accel(wing_loading, deltamach, deltat, air_temp, alt, mach, CLmax, alpha, beta, CDR=0, K2=0, g0=9.81, gamma=1.4, R_gas=287.05):
     """
     Notes
     -----
@@ -224,7 +223,7 @@ def thrust_loading_horizontal_accel(wing_loading, deltamach, deltat, air_temp, a
 
     return thrust_loading
 
-def thrust_loading_landing(wing_loading, densitys, CLmax, CD, alpha, beta, friction_coeff, vel_ratio, distance, rotation_time=3, CL=0, CDR=0, g0=9.81):
+def thrust_load_landing(wing_loading, densitys, CLmax, CD, alpha, beta, friction_coeff, vel_ratio, distance, rotation_time=3, CL=0, CDR=0, g0=9.81):
     """
     Notes
     -----
@@ -249,9 +248,29 @@ def thrust_loading_landing(wing_loading, densitys, CLmax, CD, alpha, beta, frict
 
     return thrust_loading
 
+def excess_power(wing_loading, thrust_loading, load_factor, velocity, alt, mach, CLmax, alpha, beta, K2=0, CDR=0):
+    """
+    Calculates excess power for the aircraft at the defined thrust loading, wing loading, throttle ratio for any beta, load factor
+    across the flight envelope (velocity and altitude)
+
+    Returns
+    -------
+    excess power
+    """
+    dyn_press = get_dyn_press(alt, mach)
+    CD0, K1, CD = get_drag_polar(mach, CLmax)
+
+    first = alpha/beta*thrust_loading
+    second = -K1*load_factor*beta/dyn_press*wing_loading
+    third = -K2*load_factor
+    fourth = -(CD0+CDR)/beta*wing_loading*dyn_press
+    exs_pwr = velocity*(first+second+third+fourth)
+
+    return exs_pwr 
+
 def main():
     
-    wing_loading1a = np.linspace(20, 120, 6)
+    wing_loading1a = np.linspace(20, 120, 30)
     wing_loading1 = units.convert_pressure(wing_loading1a/144, 'Pa')
     
     densitys = 1.05498044 # kg/m^3
@@ -261,7 +280,7 @@ def main():
     mach = [.1, 1.5, 1.6, .9, 1.2, 0, 1.8]
     alt = [2000, 30000, 30000, 30000, 30000, 0, 40000]
 
-    load = 5 # g
+    load_turn1 = load_turn2 = 5 # g
 
     deltamach = .8
     deltat = 50
@@ -276,20 +295,20 @@ def main():
     landing_drag = .8123
     thrust_reverse = 0
 
-    alpha1 = engine_thrust_lapse(TR, mach[0], 1, alt[0], 1)
-    alpha2 = engine_thrust_lapse(TR, mach[1], 1, alt[1], 0)
-    alpha3 = engine_thrust_lapse(TR, mach[2], 1, alt[2], 1)
-    alpha4 = engine_thrust_lapse(TR, mach[3], 1, alt[3], 1)
-    alpha5 = engine_thrust_lapse(TR, mach[4], 1, alt[4], 1)
-    alpha7 = engine_thrust_lapse(TR, mach[6], 1, alt[6], 1)
+    alpha1 = get_thrust_lapse(TR, mach[0], 1, alt[0], 1)
+    alpha2 = get_thrust_lapse(TR, mach[1], 1, alt[1], 0)
+    alpha3 = get_thrust_lapse(TR, mach[2], 1, alt[2], 1)
+    alpha4 = get_thrust_lapse(TR, mach[3], 1, alt[3], 1)
+    alpha5 = get_thrust_lapse(TR, mach[4], 1, alt[4], 1)
+    alpha7 = get_thrust_lapse(TR, mach[6], 1, alt[6], 1)
 
-    thrust_loading1 = thrust_loading_takeoff(wing_loading1, densitys, CLmax, mach[0], alpha1, beta[0], muto, kto, takeoff_distance) #
-    thrust_loading2 = thrust_loading_cruise(wing_loading1, alt[1], mach[1], CLmax, alpha2, beta[1]) # validated
-    thrust_loading3 = thrust_loading_turn(wing_loading1, load, alt[2], mach[2], CLmax, alpha3, beta[2]) # validated
-    thrust_loading4 = thrust_loading_turn(wing_loading1, load, alt[3], mach[3], CLmax, alpha4, beta[3]) # validated
-    thrust_loading5 = thrust_loading_horizontal_accel(wing_loading1, deltamach, deltat, air_temp, alt[4], mach[4], CLmax, alpha5, beta[4]) # validated
-    thrust_loading6 = thrust_loading_landing(wing_loading1, densitys, CLmax, landing_drag, thrust_reverse, beta[5], mutd, ktd, takeoff_distance)
-    thrust_loading7 = thrust_loading_cruise(wing_loading1, alt[6], mach[6], CLmax, alpha7, beta[6])
+    thrust_loading1 = thrust_load_takeoff(wing_loading1, densitys, CLmax, mach[0], alpha1, beta[0], muto, kto, takeoff_distance) # validated
+    thrust_loading2 = thrust_load_cruise(wing_loading1, alt[1], mach[1], CLmax, alpha2, beta[1]) # validated
+    thrust_loading3 = thrust_load_turn(wing_loading1, load_turn1, alt[2], mach[2], CLmax, alpha3, beta[2]) # validated
+    thrust_loading4 = thrust_load_turn(wing_loading1, load_turn2, alt[3], mach[3], CLmax, alpha4, beta[3]) # validated
+    thrust_loading5 = thrust_load_horizontal_accel(wing_loading1, deltamach, deltat, air_temp, alt[4], mach[4], CLmax, alpha5, beta[4]) # validated
+    thrust_loading6 = thrust_load_landing(wing_loading1, densitys, CLmax, landing_drag, thrust_reverse, beta[5], mutd, ktd, takeoff_distance) #validated
+    thrust_loading7 = thrust_load_cruise(wing_loading1, alt[6], mach[6], CLmax, alpha7, beta[6]) # validated
     
     thrust_loading6 = units.convert_pressure(thrust_loading6, "psi")*144
 
