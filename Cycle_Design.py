@@ -5,51 +5,68 @@ import IsentropicFlow as isenf
 import pandas as pd
 import Unit_Conversions as units
 
-def ambient_properties(mach:float, static_temperature0:float, static_pressure0:float, gamma:float=1.4, R_gas=287.05):
-    total_temperature0 = isenf.total_temperature(mach, static_temperature0, gamma)
+def ambient_properties(mach, static_temperature0, static_pressure0, gamma=1.4, 
+                       R_gas=287.05):
+    total_temperature0 = isenf.total_temperature(mach, static_temperature0, 
+                                                 gamma)
     total_pressure0    = isenf.total_pressure(mach, static_pressure0, gamma)
     static_density0 = static_pressure0/R_gas/static_temperature0
     total_density0  = total_pressure0/R_gas/total_temperature0
-    return total_temperature0, total_pressure0, static_density0, total_density0
+    return (total_temperature0, total_pressure0, static_density0, 
+            total_density0)
 
-def inlet(mach1:float, total_temperature0:float, total_pressure0:float, Ipr:float, gamma:float=1.4, R_gas:float=287.05):
+def inlet(mach1, total_temperature0, total_pressure0, Ipr, gamma=1.4, 
+          R_gas=287.05):
     """Station 1 - Fan Face"""
     total_pressure1     = Ipr*total_pressure0
     total_temperature1  = total_temperature0
-    static_temperature1 = isenf.static_temperature(mach1, total_temperature1, gamma)
+    static_temperature1 = isenf.static_temperature(mach1, total_temperature1, 
+                                                   gamma)
     static_pressure1    = isenf.static_pressure(mach1, total_pressure1, gamma)
     static_density1 = static_pressure1/R_gas/static_temperature1
     total_density1  = total_pressure1/R_gas/total_temperature1
     velocity = mach1*np.sqrt(gamma*R_gas*static_temperature1)
 
-    return total_temperature1, total_pressure1, static_temperature1, static_pressure1, velocity, static_density1, total_density1
+    return (total_temperature1, total_pressure1, static_temperature1, 
+            static_pressure1, velocity, static_density1, total_density1)
 
-def compressor(total_temperature:float, total_pressure:float, efficiency:float, pressure_ratio:float, bypass_ratio:float, gamma:float=1.4, R_gas:float=287.05):
+def compressor(total_temperature, total_pressure, efficiency, pressure_ratio, 
+               bypass_ratio, gamma=1.4, R_gas=287.05):
     """Station 2, 13 - Fan Exit\n
-    Station 3 - Compressor Exit\n
-    This set of equations works for any compressor (bypass_ratio=0), including a fan. The work results are normalized to the mass flow passing through the compressor."""
+    Station 3 - Compressor Exit\n This set of equations works for any
+    compressor (bypass_ratio=0), including a fan. The work results are
+    normalized to the mass flow passing through the compressor."""
     cp_air = gamma*R_gas/(gamma-1)
 
     total_pressure2 = pressure_ratio*total_pressure
-    total_temperature2_ideal = (total_pressure2/total_pressure)**((gamma-1)/gamma) * total_temperature
-    ideal_work = (1+bypass_ratio)*cp_air*(total_temperature2_ideal-total_temperature) # with respect to compressor mass flow
-    actual_work = ideal_work/efficiency # with respect to compressor mass flow
-    total_temperature2_actual = (total_temperature2_ideal-total_temperature)/efficiency+total_temperature
+    total_temperature2_ideal = (total_pressure2/total_pressure)**(
+        (gamma-1)/gamma) * total_temperature
+    # ideal work with respect to compressor mass flow
+    ideal_work = (1+bypass_ratio)*cp_air*(
+        total_temperature2_ideal-total_temperature) 
+    # actual work with respect to compressor mass flow
+    actual_work = ideal_work/efficiency 
+    total_temperature2_actual = (total_temperature2_ideal-total_temperature
+                                 )/efficiency+total_temperature
 
-    return total_temperature2_ideal, total_temperature2_actual, total_pressure2, ideal_work, actual_work
+    return (total_temperature2_ideal, total_temperature2_actual, 
+            total_pressure2, ideal_work, actual_work)
 
-def combustor(Tt31, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot, gamma_cold=1.4, R_gas=287.05):
+def combustor(Tt31, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot, 
+               gamma_cold=1.4, R_gas=287.05):
     """Station 4 - Combustor Exit"""
     cp_cold = gamma_cold*R_gas/(gamma_cold-1)
     cp_hot = gamma_hot*R_gas/(gamma_hot-1)
     
-    # mfuel = (m31*cp_cold*Tt31 - m31*cp_hot*Tt4)/(cp_hot*Tt4 - LHV) # Does not take into account combustor efficieny, i.e efficiency = 1
-    fuel_air_ratio = (cp_cold*Tt4 - cp_cold*Tt31)/(LHV*comb_eff - cp_cold*Tt4)*m31 # Does take into account efficiency mf/m2
+    fuel_air_ratio = (cp_cold*Tt4 - cp_cold*Tt31)/(LHV*comb_eff - 
+                                                   cp_cold*Tt4)*m31
 
     Pt4 = Pt3*comb_press_drop
     return (fuel_air_ratio, Pt4)
 
-def turbine(Tt4, Pt4, Tt31, massflow31, comp_work, fan_work, coolflow, turb_comp_eff, turb_fan_eff, gamma_hot=4/3, gamma=1.4, R_gas=287.05):
+def turbine(Tt4, Pt4, Tt31, massflow31, comp_work, fan_work, coolflow, 
+            turb_comp_eff, turb_fan_eff, gamma_hot=4/3, gamma=1.4, 
+            R_gas=287.05):
     """Station 4.9 - High Pressure Turbine (HPT) Exit\n
     Station 4.95 - Low Pressure Turbine (LPT) Entrance\n
     Station 5 - Low Pressure Turbine Exit"""
@@ -78,28 +95,34 @@ def nozzle(Tt5, Pt5, Ps9, Cv, gamma_hot=4/3, gamma=1.4 , R_gas=287.05):
 
     return (Ts9i, Ts9a, Pt9, vel9a)
 
-def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_eff, fan_press_ratio, bypass_ratio, comp_eff, comp_press_ratio, m31, LHV, Tt4, comb_eff, comb_press_drop, core_turb_eff, fan_turb_eff, turbine_cool_flow, vel_coeff_core, vel_coeff_fan, thrust, gamma_hot, gamma=1.4, R_gas=287.05):
+def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, 
+                       fan_eff, fan_press_ratio, bypass_ratio, comp_eff, 
+                       comp_press_ratio, m31, LHV, Tt4, comb_eff, 
+                       comb_press_drop, core_turb_eff, fan_turb_eff, 
+                       turbine_cool_flow, vel_coeff_core, vel_coeff_fan, 
+                       thrust, gamma_hot, gamma=1.4, R_gas=287.05):
     if bypass_ratio != 0: # Turbofan
         Tt0, Pt0, rhos0, rhot0   = ambient_properties(mach0, Tambient, Pambient)
         Tt1, Pt1, Ts1, Ps1, Vel1, rhos1, rhot1 = inlet(mach1, Tt0, Pt0, inlet_press_rec)
         Tt13i, Tt13a, Pt13, Wfi, Wfa = compressor(Tt1, Pt1, fan_eff, fan_press_ratio, bypass_ratio) # Fan
         Tt3i, Tt3a, Pt3, Wci, Wca = compressor(Tt13a, Pt13, comp_eff, comp_press_ratio, 0)
-        fuel_air_ratio, Pt4       = combustor(Tt3a, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot)
+        fuel_air_ratio, Pt4 = combustor(Tt3a, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot)
         massflow4 = m31+fuel_air_ratio
         Tt49, Tt5, Pt49, Pt5, massflow5, Tt495 = turbine(Tt4, Pt4, Tt3a, massflow4, Wca, Wfa, turbine_cool_flow, core_turb_eff, fan_turb_eff, gamma_hot)
-        Ts9i, Ts9a, Pt9, Vel9     = nozzle(Tt5, Pt5, Pambient, vel_coeff_core) # Core
+        Ts9i, Ts9a, Pt9, Vel9 = nozzle(Tt5, Pt5, Pambient, vel_coeff_core) # Core
         Ts19i, Ts19a, Pt19, Vel19 = nozzle(Tt13a, Pt13, Pambient, vel_coeff_fan) # Fan
         Tt2 = Tt13a
         Pt2 = Pt13
     else: # Turbojet
-        Tt0, Pt0, rhos0, rhot0    = ambient_properties(mach0, Tambient, Pambient)
+        Tt0, Pt0, rhos0, rhot0 = ambient_properties(mach0, Tambient, Pambient)
         Tt1, Pt1, Ts1, Ps1, Vel1, rhos1, rhot1  = inlet(mach1, Tt0, Pt0, inlet_press_rec)
         Tt3i, Tt3a, Pt3, Wci, Wca = compressor(Tt1, Pt1, comp_eff, comp_press_ratio, 0)
-        fuel_air_ratio, Pt4       = combustor(Tt3a, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot)
+        fuel_air_ratio, Pt4 = combustor(Tt3a, Tt4, m31, LHV, comb_eff, comb_press_drop, Pt3, gamma_hot)
         massflow4 = m31+fuel_air_ratio
         Tt49, Tt5, Pt49, Pt5, massflow5, Tt495 = turbine(Tt4, Pt4, Tt3a, massflow4, Wca, 0, turbine_cool_flow, core_turb_eff, 1, gamma_hot)
-        Ts9i, Ts9a, Pt9, Vel9     = nozzle(Tt5, Pt5, Pambient, vel_coeff_core) # Core
-        Vel19, Tt13i, Tt13a, Wfi, Wfa, Ts19i, Ts19a, Pt13, Pt19 = 0,0,0,0,0,0,0,0,0 # Fan specific variables
+        Ts9i, Ts9a, Pt9, Vel9 = nozzle(Tt5, Pt5, Pambient, vel_coeff_core) # Core
+        # Fan specific variables that need to be ignored
+        Vel19=Tt13i=Tt13a=Wfi=Wfa=Ts19i=Ts19a=Pt13=Pt19 = 0 
         Tt2 = Tt1
         Pt2 = Pt1
 
@@ -120,10 +143,17 @@ def engine_walkthrough(Tambient, Pambient, mach0, mach1, inlet_press_rec, fan_ef
     inlet_diameter = np.sqrt(inlet_area*4/np.pi)
     inlet_diameter_emp = inlet_diameter/.0254
     # Conversions
-    temperautres_emps = units.convert_temperature([Tambient, Tt0, Tt1, Ts1, Tt2, Tt13i, Tt13a, Tt3i, Tt3a, Tt4, Tt49, Tt495, Tt5, Ts9i, Ts9a, Ts19i, Ts19a], 'R')
-    Ts0_emp, Tt0_emp, Tt1_emp, Ts1_emp, Tt2_emp, Tt13i_emp, Tt13a_emp, Tt3i_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt495_emp, Tt5_emp, Ts9i_emp, Ts9a_emp, Ts19i_emp, Ts19a_emp = temperautres_emps
-    pressures_emps = units.convert_pressure([Pambient, Pt0, Pt1, Ps1, Pt2, Pt13, Pt3, Pt4, Pt49, Pt5, Pambient, Pt9, Pt19], 'psi')
-    Ps0_emp, Pt0_emp, Pt1_emp, Ps1_emp, Pt2_emp, Pt13_emp, Pt3_emp, Pt4_emp, Pt49_emp, Pt5_emp, Ps9_emp, Pt9_emp, Pt19_emp = pressures_emps
+    temperatures2e = [Tambient, Tt0, Tt1, Ts1, Tt2, Tt13i, Tt13a, Tt3i, 
+                    Tt3a, Tt4, Tt49, Tt495, Tt5, Ts9i, Ts9a, Ts19i, Ts19a]
+    temperautres_emps = units.convert_temperature(temperatures2e, 'R')
+    (Ts0_emp, Tt0_emp, Tt1_emp, Ts1_emp, Tt2_emp, Tt13i_emp, Tt13a_emp, 
+     Tt3i_emp, Tt3a_emp, Tt4_emp, Tt49_emp, Tt495_emp, Tt5_emp, Ts9i_emp, 
+     Ts9a_emp, Ts19i_emp, Ts19a_emp) = temperautres_emps
+    pressures2e = [Pambient, Pt0, Pt1, Ps1, Pt2, Pt13, Pt3, Pt4, Pt49, Pt5, 
+                   Pambient, Pt9, Pt19]
+    pressures_emps = units.convert_pressure(pressures2e, 'psi')
+    (Ps0_emp, Pt0_emp, Pt1_emp, Ps1_emp, Pt2_emp, Pt13_emp, Pt3_emp, 
+     Pt4_emp, Pt49_emp, Pt5_emp, Ps9_emp, Pt9_emp, Pt19_emp) = pressures_emps
 
     Vel1_emp = Vel1 / 12 / .0254
     Vel9_emp = Vel9 / 12 / .0254
