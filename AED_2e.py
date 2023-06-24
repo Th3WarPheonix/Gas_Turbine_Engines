@@ -5,7 +5,10 @@ import Unit_Conversions as units
 import matplotlib.pyplot as plt
 
 def get_atmos(altitude):
-    """Altitude in feet
+    """
+    Notes
+    -----
+    Altitude in feet
     
     Returns
     -------
@@ -20,6 +23,12 @@ def get_atmos(altitude):
 
 def get_dyn_press(alt, mach, gamma=1.4):
     """
+    Notes
+    -----
+    Altitude in feet
+    
+    pg 11
+    
     Returns
     -------
     dynamic pressure in Pascals
@@ -55,6 +64,8 @@ def get_drag_polar(mach0:int, CLmax, vel_ratio=1.2, K2=0):
     K' = induced drag
     K" = viscous drag
     Kprime = 1/pi/aspect_ratio/efficiency
+    
+    pg 37
 
     Returns
     ------
@@ -99,6 +110,8 @@ def get_thrust_lapse(throttle_ratio, mach0, engine_type, alt=30, mode=0, gamma=1
     alpha is the installed full throttle thrust lapse, which depends on
     altitude, speed, and whether or not an afterburner is operating
     Thrust = alpha*thrustsl
+
+    pg 38
     
     Parameters
     ----------
@@ -170,6 +183,8 @@ def thrst_ld_takeoff(wing_loading, densitys, CLmax, mach, alpha, beta,
     standard rotation time is 3 secs
     epsilon is the sum of the drags on the aircraft
     kto is the ratio of takeoff veloicty to stall velocity
+
+    pg 25
     """
     CD = get_drag_polar(mach, CLmax, vel_ratio_to)[2]
 
@@ -191,6 +206,8 @@ def thrst_ld_cruise(wing_loading, alt, mach, CLmax, alpha, beta,
     
     Thrust loading = Thrust/Wto
     Wing Loading = Wto/S
+
+    pg 26
     """
     dyn_press = get_dyn_press(alt, mach)
     CD0, K1, CD = get_drag_polar(mach, CLmax)
@@ -208,6 +225,8 @@ def thrst_ld_turn(wing_loading, load_factor, alt, mach, CLmax, alpha,
     
     Thrust loading = Thrust/Wto
     Wing Loading = Wto/S
+
+    pg 27
     """
     dyn_press = get_dyn_press(alt, mach)
     CD0, K1, CD = get_drag_polar(mach, CLmax)
