@@ -38,12 +38,19 @@ def _find_mach2(mach, massflow, densityt, Tt, flow_area, velocity_comp, gamma, R
     """
     Notes
     -----
-    Find Mach number from given massflow, total temperature, density, and flow area and a given velocity component
-    Mach number is the variable that is changing to converge get the velocitys to match.
-    The function is used when a certain velocity needs to be known to satisfy mass conservation but there is a velocity component that does not contribute to conservation of mass. As in when only the axial component of exhaust velocity contributes to mass flow, and not the azimthual component, in a turbine.
-    The squared velocities are compared because during iterations velocity component might, impossibly, be greater than the total velocity of the exhaust.
-    Function to be used with the newton2 solver in the RootFinding module.
-    Function iterates even though only one unknown is present because rearraning the equations is too complicated
+    Find Mach number from given massflow, total temperature, density, 
+    and flow area and a given velocity component. Mach number is the 
+    variable that is changing to converge get the velocitys to match. 
+    The function is used when a certain velocity needs to be known to 
+    satisfy mass conservation but there is a velocity component that 
+    does not contribute to conservation of mass. As in when only the 
+    axial component of exhaust velocity contributes to mass flow, and 
+    not the azimthual component, in a turbine. The squared velocities 
+    are compared because during iterations velocity component might, 
+    impossibly, be greater than the total velocity of the exhaust.
+    Function to be used with the newton2 solver in the RootFinding 
+    module. Function iterates even though only one unknown is present 
+    because rearraning the equations is too complicated
     
     Returns
     -------
