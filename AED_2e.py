@@ -324,7 +324,7 @@ def excess_power(wing_loading, thrust_loading, load_factor, velocity, alt,
     alt : altitude in feet no regard for other units
     all other parameters units in SI
     """
-    dyn_press = units.convert_pressure(get_dyn_press(alt, mach), 'psi')*144
+    dyn_press = get_dyn_press(alt, mach)
     CD0, K1, CD = get_drag_polar(mach, CLmax, sup=True)
 
     first  = alpha/beta*thrust_loading
@@ -410,26 +410,19 @@ def power_analysis():
     load_factor = 1
     beta = .97
     CLmax = 2
-    # wing_loading = units.convert_pressure(wing_loading/144, 'Pa')
+    wing_loading = units.convert_pressure(wing_loading/144, 'Pa')
     N = 100
     velocity = np.linspace(100, 2000, N)*.0254*12 # ft/sec
     altitude = np.linspace(0, 70000, N) # ft
     power = np.zeros((N, N))
-    alpha = np.empty_like(altitude)
     mach = velocity/atmos(altitude).speed_of_sound
-
-    xxx, yyy = np.meshgrid(velocity, altitude)
-
+   
     for i, alt in enumerate(altitude):
-        alpha[i] = get_thrust_lapse(throttle_ratio, mach[i], 1, alt, 0)
-    
-    
-    for i, alt in enumerate(altitude):
+        alpha = get_thrust_lapse(throttle_ratio, mach[i], 1, alt, 0)
         for j, vel in enumerate(velocity):
             power[i][j] = excess_power(wing_loading, thrust_loading, load_factor, 
-                                 vel/12/.0254, alt, mach[i], CLmax, alpha[i], beta)
+                                 vel, alt, mach[i], CLmax, alpha, beta)
     power = power/12/.0254
-    
     
     levels = np.arange(0, 600+1, 50)
     x = np.linspace(13, 5, 10)
@@ -441,12 +434,12 @@ def power_analysis():
             zz2[j][i] = np.sqrt(xs**2 + ys**2)
 
 
-    plt.contourf(np.linspace(0, 70, N)*1000, np.linspace(100, 2000, N), power, levels)
+    plt.contourf(velocity/12/.0254, altitude, power, levels)
     plt.colorbar()
     plt.savefig('pic.png')
 
     alt = 36000
-    vel = 1480*12*.0254
+    vel = 1600*12*.0254
     mach = vel/(atmos(alt).speed_of_sound)[0]
     alpha = get_thrust_lapse(throttle_ratio, mach, 1, alt, 0)
     pwr = excess_power(wing_loading, thrust_loading, load_factor, vel, alt, mach, CLmax, alpha, beta)
