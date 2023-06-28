@@ -335,6 +335,12 @@ def excess_power(wing_loading, thrust_loading, load_factor, velocity, alt,
     return exs_pwr 
 
 def constraint_analysis():
+    """
+    Notes
+    -----
+    Need to aid remining constraint equations form chapter 2 but
+    currently not necessary for remainder of book walkthrough
+    """
     
     wing_loading1a = np.linspace(20, 120, 30)
     wing_loading1 = units.convert_pressure(wing_loading1a/144, 'Pa')
@@ -407,6 +413,9 @@ def power_analysis():
     Mimics plot on pg 48 but slight indent on righgt corner of envelope
     Single point calculation performed after plotting gives 316 ft/s
     book gives 320 ft/s
+
+    More resolution needed but takes to long to render plot, convert to
+    C or Fortran
     """
     # Chosen design point
     thrust_loading = 1.25
@@ -444,6 +453,71 @@ def power_analysis():
     pwr = excess_power(wing_loading, thrust_loading, load_factor, vel, alt, mach, CLmax, alpha, beta)
     print(pwr/.0254/12)
 
+def empty_wieght_frac(takeoff_weight, type='fighter'):
+    """
+    Notes
+    -----
+    Preliminary results for empty wieght fraction, the ratio of empty aircrat wieght to takeoff weight (We/Wto).
+    
+    Parameters
+    ---------
+    type : type of aircraft
+        fighter
+        cargo
+        passenger
+        twin tprop
+    """
+    match type:
+        case 'fighter':
+            we_frac = 2.34*takeoff_weight**-0.13
+        case 'cargo':
+            we_frac = 1.26*takeoff_weight**-0.08
+        case 'passenger':
+            we_frac = 1.02*takeoff_weight**-0.06
+        case 'twin tprop':
+            we_frac = 0.96*takeoff_weight**-0.05
+
+    return we_frac
+
+def tsfc_initial(mach0, theta, engine_type=1, mode='mil'):
+    """
+    Notes
+    -----
+    Provide an inital estimate for the thrust specific fuel consumption
+    """
+    match engine_type:
+        case 0: # high bypass turbofan
+            tsfc = (0.45+0.54*mach0)
+        case 1: # low bypass turbofan
+            if mode == 0: # military power
+                tsfc = 0.6*norm_Pt*(1-3.8*(norm_Tt-throttle_ratio)/
+                                            norm_Tt*zeta)
+            elif mode == 1: # maximum power
+                tsfc = norm_Pt*(1-3.5*(norm_Tt-throttle_ratio)/
+                                        norm_Tt*zeta)
+        case 2: # turbojet
+            if mode == 0: # military power
+                tsfc = 0.8*norm_Pt*(1-.16*np.sqrt(mach0) - 
+                                            25/norm_Tt*(norm_Tt-throttle_ratio)
+                                            /(9+mach0)*zeta)
+            elif mode == 1: # maximum power
+                tsfc = norm_Pt*(1-0.3*(norm_Tt-1)-0.1*np.sqrt(mach0) -
+                                         1.5*(norm_Tt-throttle_ratio)/
+                                         norm_Tt*zeta)
+        case 3: # turboprop
+
+def mission_analysis():
+
+
 if __name__ == '__main__':
     # constraint_analysis()
-    power_analysis()
+
+    # Aircraft intrinsic properties
+    CLmax = 2
+    # Chosen design point
+    thrust_loading = 1.25
+    wing_loading = 64 # lbf/ft^2
+    throttle_ratio = 1.07
+
+    #power_analysis()
+    mission_analysis()
