@@ -308,7 +308,6 @@ def excess_power(wing_loading, thrust_loading, load_factor, velocity, alt,
     """
     Notes
     -----
-    NOT VALIDATED
     Calculates excess power for the aircraft at the defined thrust
     loading, wing loading, throttle ratio for any beta, load factor
     across the flight envelope (altitude vs altitude)
@@ -402,6 +401,13 @@ def constraint_analysis():
     plt.close()
 
 def power_analysis():
+    """
+    Notes
+    -----
+    Mimics plot on pg 48 but slight indent on righgt corner of envelope
+    Single point calculation performed after plotting gives 316 ft/s
+    book gives 320 ft/s
+    """
     # Chosen design point
     thrust_loading = 1.25
     wing_loading = 64 # lbf/ft^2
@@ -411,35 +417,28 @@ def power_analysis():
     beta = .97
     CLmax = 2
     wing_loading = units.convert_pressure(wing_loading/144, 'Pa')
-    N = 100
-    velocity = np.linspace(100, 2000, N)*.0254*12 # ft/sec
-    altitude = np.linspace(0, 70000, N) # ft
+    N = 200
+    velocity = np.linspace(100, 1900, N)*.0254*12 # ft/sec
+    altitude = np.linspace(0, 60000, N) # ft
     power = np.zeros((N, N))
-    mach = velocity/atmos(altitude).speed_of_sound
-   
+     
     for i, alt in enumerate(altitude):
-        alpha = get_thrust_lapse(throttle_ratio, mach[i], 1, alt, 0)
         for j, vel in enumerate(velocity):
+            mach = (vel/atmos(alt).speed_of_sound)[0]
+            alpha = get_thrust_lapse(throttle_ratio, mach, 1, alt, 0)
             power[i][j] = excess_power(wing_loading, thrust_loading, load_factor, 
-                                 vel, alt, mach[i], CLmax, alpha, beta)
+                                 vel, alt, mach, CLmax, alpha, beta)
     power = power/12/.0254
-    
+
     levels = np.arange(0, 600+1, 50)
-    x = np.linspace(13, 5, 10)
-    y = np.linspace(-7, 5, 10)
-
-    zz2 = np.zeros((10, 10))
-    for i, xs in enumerate(x):
-        for j, ys in enumerate(y):
-            zz2[j][i] = np.sqrt(xs**2 + ys**2)
-
-
     plt.contourf(velocity/12/.0254, altitude, power, levels)
     plt.colorbar()
-    plt.savefig('pic.png')
+    plt.xlabel('Velocity (ft/s)')
+    plt.ylabel('Alt (ft)')
+    plt.savefig('Excess Power Envelope.png')
 
     alt = 36000
-    vel = 1600*12*.0254
+    vel = 1400*12*.0254
     mach = vel/(atmos(alt).speed_of_sound)[0]
     alpha = get_thrust_lapse(throttle_ratio, mach, 1, alt, 0)
     pwr = excess_power(wing_loading, thrust_loading, load_factor, vel, alt, mach, CLmax, alpha, beta)
