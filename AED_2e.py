@@ -457,15 +457,15 @@ def empty_wieght_frac(takeoff_weight, type='fighter'):
     """
     Notes
     -----
-    Preliminary results for empty wieght fraction, the ratio of empty aircrat wieght to takeoff weight (We/Wto).
+    Preliminary results for empty wieght fraction, the ratio of empty
+    aircrat wieght to takeoff weight (We/Wto).
+
+    p 71
     
     Parameters
     ---------
     type : type of aircraft
-        fighter
-        cargo
-        passenger
-        twin tprop
+        fighter cargo passenger twin tprop
     """
     match type:
         case 'fighter':
@@ -484,27 +484,30 @@ def tsfc_initial(mach0, theta, engine_type=1, mode='mil'):
     Notes
     -----
     Provide an inital estimate for the thrust specific fuel consumption
+    units of 1/hour
+
+    p 71
     """
     match engine_type:
         case 0: # high bypass turbofan
-            tsfc = (0.45+0.54*mach0)
+            tsfc = (0.45+0.54*mach0)*np.sqrt(theta)
         case 1: # low bypass turbofan
             if mode == 0: # military power
-                tsfc = 0.6*norm_Pt*(1-3.8*(norm_Tt-throttle_ratio)/
-                                            norm_Tt*zeta)
+                tsfc = (0.9+0.30*mach0)*np.sqrt(theta)
             elif mode == 1: # maximum power
-                tsfc = norm_Pt*(1-3.5*(norm_Tt-throttle_ratio)/
-                                        norm_Tt*zeta)
+                tsfc = (1.6+0.27*mach0)*np.sqrt(theta)
         case 2: # turbojet
             if mode == 0: # military power
-                tsfc = 0.8*norm_Pt*(1-.16*np.sqrt(mach0) - 
-                                            25/norm_Tt*(norm_Tt-throttle_ratio)
-                                            /(9+mach0)*zeta)
+                tsfc = (1.1+0.30*mach0)*np.sqrt(theta)
             elif mode == 1: # maximum power
-                tsfc = norm_Pt*(1-0.3*(norm_Tt-1)-0.1*np.sqrt(mach0) -
-                                         1.5*(norm_Tt-throttle_ratio)/
-                                         norm_Tt*zeta)
+                tsfc = (1.5+0.23*mach0)*np.sqrt(theta)
         case 3: # turboprop
+            tsfc = (0.18+0.8*mach0)*np.sqrt(theta)
+
+    return tsfc
+
+def best_cruise_alt():
+    
 
 def mission_analysis():
 
