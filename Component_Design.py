@@ -647,7 +647,7 @@ def compressor_blade_design(Tt0, Pt0, mach0, massflow, flowarea1, CPR,
                                  spool_speed2=spool_speed2, 
                                  cp_gas=cp_gas, gminusg=gminusg, R_gas=R_gas)
         
-        unused, Tt1, densitys1, Ts1 = _find_cz(velc1, Ts0, Pt1, wvel0, velct1, 
+        _, Tt1, densitys1, Ts1 = _find_cz(velc1, Ts0, Pt1, wvel0, velct1, 
                                                massflow, flowarea1, 
                                                spool_speed1, spool_speed2, 
                                                cp_gas, gminusg, R_gas)
@@ -1100,7 +1100,7 @@ def turbine_blade_design(Tt0, Pt0, Tt2, Pt2, work, alpha2, massflow, tip_diam,
                              densityt=densityt0, Tt=Tt0, flow_area=flow_area, 
                              velocity_comp=velct1, gamma=gamma_hot, 
                              R_gas=R_gas)
-    unused, velcz1 = _find_mach2(mach1, massflow, densityt0, Tt0, flow_area, 
+    _, velcz1 = _find_mach2(mach1, massflow, densityt0, Tt0, flow_area, 
                                  velct1, gamma=gamma_hot, R_gas=R_gas)
     alpha1 = np.arctan(velct1/velcz1)
     Ps1 = isenf.static_pressure(mach1, Pt0, gamma_hot)
