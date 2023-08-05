@@ -4,6 +4,85 @@ from ambiance import Atmosphere as atmos
 import Unit_Conversions as units
 import matplotlib.pyplot as plt
 
+Pstd = 101325 # Pa
+Tstd = 288.15 # K
+densitystd = 1.225 # kg/m^3
+sound_speed_std = 340.3 # m/s
+
+"""
+Variables 
+---------
+variable name : actual name : quantity/description : in book
+
+wngld : wing loading : takeoff_weight/wing_planform_area : Wto/S
+thstld : thrust laoding : thrust/takeoff_weight : T/Wto
+engtype : engine type : tj, lbtf, tp, etc : 
+thrtlrto : throttle ratio :  : TR
+thstlps : installed thrust lapse : thrust/sea_level_thrust: alpha
+instwf : instantaneous weight fraction : weight/takeoff_weight : beta
+
+alt : altiude : : 
+gamma : ratio of specific heat : cp/cv : gamma
+Rgas : gas specific gas constant : : R
+
+CLmax : maximum coefficient of lift : lift/density/S/V^2/2 : C_Lmax
+CD : coefficient of drag : drag/density/S/V^2/2 : C_D
+CD0 : parasite drag : drag coeff at zero lift, CDmin + K"Cmin^2: C_D0
+CDR : coefficient of additional drags : : C_DR
+CDstar : drag coefficient at max L/D : : C*_D
+Kp1 : invscid/induced drag coefficient : 1/pi/aspct_rto/efficiency : K'
+Kp2 : viscid drag coefficient : K" : K"
+K1 : drag polar coefficient 1 : K1 = K' + K" : K1
+K2 : drag polar coefficient 2 : K2 = -2K"CLmin : K2
+
+drgcf : drag coefficient :  : epsilon
+frccf : friction coefficient :  : mu
+velrt : velocity ratio : velocity/stall_velocity : k
+
+thetat : nondimensional total temperature : Tt/Tstd : theta_0
+thetas : nondimensional static temperature : Ts/Tstd : theta
+deltat : nondimensional total pressure : Pt/Pstd : delta_0
+deltas : nondimensional static pressure : Ps/Pstd : delta
+sigmat : nondimensional total density : densityt/densitystd : sigma_0
+sigmat : nondimensional static density : densitys/densitystd : sigma
+dynpress : dynamic pressure : density*velocity^2/2 : q
+thetabrk : theta break : control system maximum Tt4 and compressor 
+    pressure ratio : theta_0_break
+
+swpang : wing sweep angle :  : Lambda
+ldfactor : load factor :  : n
+thstang : angle of thrust vector to chord line :  : psi 
+emptwf : empty aircraft weight fraction : We/Wto : Gamma
+drgthst : total drag-to-thrust ratio : : u
+tsfc : thrust specific fuel consumption : fuel_rate/thrust : tsfc
+
+Abbreviations and tags
+----------------------
+BCA : best cruise altitude
+BCM : best cruise altitude
+SLS : sea level static
+dry : afterburner off
+wet : afterburner on
+anlys : analysis
+horz : horizontal
+accel : acceleration
+ln : landing
+to : takeoff
+td : touchdown
+obs : obstacle
+
+"""
+
+def mass_flow_parameter(mach, gamma, Rgas):
+    """
+    Returns
+    -------
+    mfp : mass flow parameter m*sqrt(Tt)/Pt/A
+    """
+    exponent = (gamma+1)/2/(1-gamma)
+    mfp = mach*np.sqrt(gamma/Rgas)*((1+(gamma-1)/2)*mach**2)**exponent
+    return mfp
+
 def get_atmos(altitude):
     """
     Notes
@@ -51,7 +130,7 @@ def get_dyn_press(alt, mach, gamma=1.4):
     return delta*101325*mach**2*gamma/2
 
 
-def get_drag_polar(mach0:int, CLmax, vel_ratio=1.25, K2=0, sup=False):
+def get_drag_polar(mach0:int, CLmax, velrt=1.25, K2=0, CL=0, suppress=False):
     """
     Notes
     -----
@@ -65,28 +144,23 @@ def get_drag_polar(mach0:int, CLmax, vel_ratio=1.25, K2=0, sup=False):
     .75 <= efficiency <= .85
 
     Lift-drag polar breakdown
-    CD = CDmin + K'C^2 + K"(CL - CLmin)^2
+    CD = CDmin + K'CL^2 + K"(CL - CLmin)^2
     CD = K1CL^2 + K2CL + CDO
-    K1 = K' + K"
-    K2 = -2K"CLmin
-    CD0 = CDmin + K"Cmin^2
-    K' = induced drag
-    K" = viscous drag
-    Kprime = 1/pi/aspect_ratio/efficiency
     
-    pg 37
+    
+    pg 25,37
 
     Returns
     ------
     0: CD0
     1: K1
-    2: CD, drag coefficient
+    2: CD
 
     Parameters
     ----------
     mach0 : freestream mach number
     CLmax : maximum coefficient of lift
-    vel_ratio : velocity ratio V = vel_ratio*Vstall
+    velrt : velocity ratio V = velrt*Vstall
     """
 
     if 0 <= mach0 <= 1:
@@ -95,7 +169,7 @@ def get_drag_polar(mach0:int, CLmax, vel_ratio=1.25, K2=0, sup=False):
         K1 = (.18 - .36)/(1-2)*(mach0-1)+.18
     else:
         K1 = 0
-        if not sup: print("Flight mach number not in range for turbine engines1")
+        if not suppress: print("Flight mach number not in range for turbine engines1")
 
     if 0 <= mach0 <= 0.8:
         CD0 = .014
@@ -109,21 +183,21 @@ def get_drag_polar(mach0:int, CLmax, vel_ratio=1.25, K2=0, sup=False):
         CD0 = .028
     else:
         CD0 = 0
-        if not sup: print("Flight mach number not in range for turbine engines2")
+        if not suppress: print("Flight mach number not in range for turbine engines2")
         
-    CL = CLmax/vel_ratio**2
+    if not CL: CL = CLmax/velrt**2
     CD = K1*CL**2+K2*CL+CD0
 
     return (CD0, K1, CD)
 
-def get_thrust_lapse(throttle_ratio:float, mach0, engine_type,
+def get_thstlps(thrtlrto:float, mach0, engine_type,
                      mode, alt:float=30000, gamma=1.4):
     """
     Notes
     -----
     Alpha is the installed full throttle thrust lapse, which depends on
     altitude, speed, and whether or not an afterburner is operating. i.e
-    thrust = (alpha)(thrust_sea_level)
+    alpha = thrust/thrust_sea_level
 
     pg 38
     
@@ -151,41 +225,54 @@ def get_thrust_lapse(throttle_ratio:float, mach0, engine_type,
     norm_Tt = theta*(1+(gamma-1)/2*mach0**2)
     norm_Pt = delta*(1+(gamma-1)/2*mach0**2)**(gamma/(gamma-1))
 
-    if norm_Tt <= throttle_ratio:
+    if norm_Tt <= thrtlrto:
         zeta = 0
     else:
         zeta = 1
 
     match engine_type:
         case 'hbtf': # high bypass turbofan
-            thrust_lapse = norm_Pt*(1-0.49*np.sqrt(mach0) - 
-                                    3*(norm_Tt-throttle_ratio)/
+            thstlps = norm_Pt*(1-0.49*np.sqrt(mach0) - 
+                                    3*(norm_Tt-thrtlrto)/
                                     (1.5+mach0)*zeta)
         case 'lbtf': # low bypass turbofan
             if mode == 'mil': # military power
-                thrust_lapse = 0.6*norm_Pt*(1-3.8*(norm_Tt-throttle_ratio)/
+                thstlps = 0.6*norm_Pt*(1-3.8*(norm_Tt-thrtlrto)/
                                             norm_Tt*zeta)
             elif mode == 'max': # maximum power
-                thrust_lapse = norm_Pt*(1-3.5*(norm_Tt-throttle_ratio)/
+                thstlps = norm_Pt*(1-3.5*(norm_Tt-thrtlrto)/
                                         norm_Tt*zeta)
         case 'tj': # turbojet
             if mode == 'mil': # military power
-                thrust_lapse = 0.8*norm_Pt*(1-.16*np.sqrt(mach0) - 
-                                            25/norm_Tt*(norm_Tt-throttle_ratio)
+                thstlps = 0.8*norm_Pt*(1-.16*np.sqrt(mach0) - 
+                                            25/norm_Tt*(norm_Tt-thrtlrto)
                                             /(9+mach0)*zeta)
             elif mode == 'max': # maximum power
-                thrust_lapse = norm_Pt*(1-0.3*(norm_Tt-1)-0.1*np.sqrt(mach0) -
-                                         1.5*(norm_Tt-throttle_ratio)/
+                thstlps = norm_Pt*(1-0.3*(norm_Tt-1)-0.1*np.sqrt(mach0) -
+                                         1.5*(norm_Tt-thrtlrto)/
                                          norm_Tt*zeta)
         case 'tp': # turboprop
-            thrust_lapse = norm_Pt # less than mach = 0.1
-            thrust_lapse = norm_Pt*(1-0.96*(mach0-1)**0.25 - 3/8.13*(
-                norm_Tt-throttle_ratio)/(mach0-0.1)*zeta)
+            thstlps = norm_Pt # less than mach = 0.1
+            thstlps = norm_Pt*(1-0.96*(mach0-1)**0.25 - 3/8.13*(
+                norm_Tt-thrtlrto)/(mach0-0.1)*zeta)
     
-    return thrust_lapse
+    return thstlps
 
-def thrst_ld_takeoff(wing_load, densitys, CLmax, mach, alpha, beta, 
-                        friction_coeff, vel_ratio_to, takeoff_distance, 
+
+def get_takeoff_vel(beta, CLmax, densitys, wngld, kto=1.2):
+    """
+    Notes
+    -----
+    Calculates the takeoff velocity
+    
+    p 29
+    """
+    vel_to = kto*np.sqrt(2*beta/densitys/CLmax*wngld)
+    return vel_to
+
+
+def thstld_takeoff(wngld, densitys, CLmax, mach, alpha, beta, 
+                        frccf_ln, velrt_to, takeoff_distance, 
                         rot_time=3, CL=0, CDR=0, g0=9.81):
     """
     Notes
@@ -205,18 +292,18 @@ def thrst_ld_takeoff(wing_load, densitys, CLmax, mach, alpha, beta,
 
     pg 34
     """
-    CD = get_drag_polar(mach, CLmax, vel_ratio_to)[2]
+    CD = get_drag_polar(mach, CLmax, velrt_to)[2]
 
-    epsilon_to = CD + CDR + friction_coeff*CL
+    epsilon_to = CD + CDR + frccf_ln*CL
     third = beta/densitys/g0/epsilon_to
-    second = rot_time*vel_ratio_to*np.sqrt(2*beta/densitys/CLmax)
-    first = -(takeoff_distance-second*np.sqrt(wing_load))/third/wing_load
-    thrust_load = (epsilon_to*vel_ratio_to**2/(1-np.exp(first))/CLmax+
-                      friction_coeff)*beta/alpha
+    second = rot_time*velrt_to*np.sqrt(2*beta/densitys/CLmax)
+    first = -(takeoff_distance-second*np.sqrt(wngld))/third/wngld
+    thstld = (epsilon_to*velrt_to**2/(1-np.exp(first))/CLmax+
+                      frccf_ln)*beta/alpha
 
-    return thrust_load
+    return thstld
 
-def thrst_ld_cruise(wing_load, alt, mach, CLmax, alpha, beta, 
+def thstld_cruise(wngld, alt, mach, CLmax, alpha, beta, 
                        CDR=0, K2=0):
     """
     Notes
@@ -230,12 +317,12 @@ def thrst_ld_cruise(wing_load, alt, mach, CLmax, alpha, beta,
     """
     dyn_press = get_dyn_press(alt, mach)
     CD0, K1, CD = get_drag_polar(mach, CLmax)
-    thrust_load = beta/alpha*(K1*beta/dyn_press*wing_load + K2 + 
-                                 (CD0+CDR)/beta*dyn_press/wing_load) 
+    thstld = beta/alpha*(K1*beta/dyn_press*wngld + K2 + 
+                                 (CD0+CDR)/beta*dyn_press/wngld) 
 
-    return thrust_load
+    return thstld
 
-def thrst_ld_turn(wing_load, load_factor, alt, mach, CLmax, alpha, 
+def thstld_turn(wngld, load_factor, alt, mach, CLmax, alpha, 
                      beta, CDR=0, K2=0):
     """
     Notes
@@ -252,14 +339,13 @@ def thrst_ld_turn(wing_load, load_factor, alt, mach, CLmax, alpha,
 
     first  = K1*load_factor**2*beta/dyn_press
     second = (CD0+CDR)/beta*dyn_press
-    thrust_load = beta/alpha*(first*wing_load + K2*load_factor + 
-                                 second/wing_load) 
+    thstld = beta/alpha*(first*wngld + K2*load_factor + 
+                                 second/wngld) 
 
-    return thrust_load
+    return thstld
 
-def thrst_ld_horz_accel(wing_load, deltamach, deltat, air_temp, 
-                                 alt, mach, CLmax, alpha, beta, CDR=0, K2=0, 
-                                 g0=9.81, gamma=1.4, R_gas=287.05):
+def thstld_horzaccel(wngld, deltamach, deltat, air_temp, alt, mach, CLmax, 
+                     alpha, beta, CDR=0, K2=0, g0=9.81, gamma=1.4, Rgas=287.05):
     """
     Notes
     -----
@@ -275,14 +361,13 @@ def thrst_ld_horz_accel(wing_load, deltamach, deltat, air_temp,
 
     first  = K1*beta/dyn_press
     second = (CD0+CDR)/beta*dyn_press
-    third = np.sqrt(gamma*R_gas*air_temp)*(deltamach)/g0/deltat
-    thrust_load = beta/alpha*(first*wing_load + K2 + 
-                                 second/wing_load + third) 
+    third = np.sqrt(gamma*Rgas*air_temp)*(deltamach)/g0/deltat
+    thstld = beta/alpha*(first*wngld + K2 + 
+                                 second/wngld + third) 
 
-    return thrust_load
+    return thstld
 
-def thrst_ld_landing(wing_load, densitys, CLmax, CD, alpha, beta, 
-                        friction_coeff, vel_ratio, distance, rotation_time=3, 
+def thstld_landing(wngld, densitys, CLmax, CD, alpha, beta, frccf_ln, velrt, distance, rotation_time=3, 
                         CL=0, CDR=0, g0=9.81):
     """
     Notes
@@ -297,23 +382,23 @@ def thrst_ld_landing(wing_load, densitys, CLmax, CD, alpha, beta,
 
     pg 31
     """
-    epsilon = CD + CDR + friction_coeff*CL
+    epsilon = CD + CDR + frccf_ln*CL
     third = beta/densitys/g0/epsilon
-    second = rotation_time*vel_ratio*np.sqrt(2*beta/densitys/CLmax)
+    second = rotation_time*velrt*np.sqrt(2*beta/densitys/CLmax)
     
     if alpha != 0:
-        first = (distance-second*np.sqrt(wing_load))/third/wing_load
-        thrust_load = (epsilon*vel_ratio**2/(np.exp(first)-1)/CLmax-
-                          friction_coeff)*beta/alpha
+        first = (distance-second*np.sqrt(wngld))/third/wngld
+        thstld = (epsilon*velrt**2/(np.exp(first)-1)/CLmax-
+                          frccf_ln)*beta/alpha
     else:
-        fourth = third*np.log(1+epsilon/friction_coeff/CLmax*vel_ratio**2)
-        thrust_load = ((-second+np.sqrt(second**2+4*fourth*distance))/
+        fourth = third*np.log(1+epsilon/frccf_ln/CLmax*velrt**2)
+        thstld = ((-second+np.sqrt(second**2+4*fourth*distance))/
                           2/fourth)**2
 
-    return thrust_load
+    return thstld
 
-def excess_power(wing_load, thrust_load, load_factor, velocity, alt, 
-                 mach, CLmax, alpha, beta, K2=0, CDR=0):
+def excess_power(wngld, thstld, load_factor, velocity, alt, mach, CLmax, alpha,
+                 beta, K2=0, CDR=0):
     """
     Notes
     -----
@@ -333,17 +418,17 @@ def excess_power(wing_load, thrust_load, load_factor, velocity, alt,
     all other parameters units in SI
     """
     dyn_press = get_dyn_press(alt, mach)
-    CD0, K1, CD = get_drag_polar(mach, CLmax, sup=True)
+    CD0, K1, CD = get_drag_polar(mach, CLmax, suppress=True)
 
-    first  = alpha/beta*thrust_load
-    second = -K1*load_factor**2*beta/dyn_press*wing_load
+    first  = alpha/beta*thstld
+    second = -K1*load_factor**2*beta/dyn_press*wngld
     third  = -K2*load_factor
-    fourth = -(CD0+CDR)/beta/wing_load*dyn_press
+    fourth = -(CD0+CDR)/beta/wngld*dyn_press
     exs_pwr = velocity*(first+second+third+fourth)
 
     return exs_pwr 
 
-def constraint_analysis(eng_type):
+def constraint_anlys(engtype):
     """
     Notes
     -----
@@ -351,8 +436,8 @@ def constraint_analysis(eng_type):
     currently not necessary for remainder of book walkthrough
     """
     
-    wing_load1a = np.linspace(20, 120, 30)
-    wing_load1 = units.convert_pressure(wing_load1a/144, 'Pa')
+    wngld1a = np.linspace(20, 120, 30)
+    wngld1 = units.convert_pressure(wngld1a/144, 'Pa')
     
     densitys = 1.05498044 # kg/m^3
     TR = 1.07
@@ -376,38 +461,38 @@ def constraint_analysis(eng_type):
     landing_drag = .8123
     thrust_reverse = 0
 
-    alpha1 = get_thrust_lapse(TR, mach[0], eng_type, 'max', alt[0])
-    alpha2 = get_thrust_lapse(TR, mach[1], eng_type, 'mil', alt[1])
-    alpha3 = get_thrust_lapse(TR, mach[2], eng_type, 'max', alt[2])
-    alpha4 = get_thrust_lapse(TR, mach[3], eng_type, 'max', alt[3])
-    alpha5 = get_thrust_lapse(TR, mach[4], eng_type, 'max', alt[4])
-    alpha7 = get_thrust_lapse(TR, mach[6], eng_type, 'max', alt[6])
+    alpha1 = get_thstlps(TR, mach[0], engtype, 'max', alt[0])
+    alpha2 = get_thstlps(TR, mach[1], engtype, 'mil', alt[1])
+    alpha3 = get_thstlps(TR, mach[2], engtype, 'max', alt[2])
+    alpha4 = get_thstlps(TR, mach[3], engtype, 'max', alt[3])
+    alpha5 = get_thstlps(TR, mach[4], engtype, 'max', alt[4])
+    alpha7 = get_thstlps(TR, mach[6], engtype, 'max', alt[6])
     # All thrust loading equations have been validated
-    thrst_ld1 = thrst_ld_takeoff(wing_load1, densitys, CLmax, mach[0], 
-                                 alpha1, beta[0], muto, kto, takeoff_distance) 
-    thrst_ld2 = thrst_ld_cruise(wing_load1, alt[1], mach[1], CLmax, alpha2,
+    thstld1 = thstld_takeoff(wngld1, densitys, CLmax, mach[0], alpha1, 
+                                 beta[0], muto, kto, takeoff_distance) 
+    thstld2 = thstld_cruise(wngld1, alt[1], mach[1], CLmax, alpha2,
                                 beta[1]) 
-    thrst_ld3 = thrst_ld_turn(wing_load1, load_turn1, alt[2], mach[2], 
+    thstld3 = thstld_turn(wngld1, load_turn1, alt[2], mach[2], 
                               CLmax, alpha3, beta[2]) 
-    thrst_ld4 = thrst_ld_turn(wing_load1, load_turn2, alt[3], mach[3], 
-                              CLmax, alpha4, beta[3]) 
-    thrst_ld5 = thrst_ld_horz_accel(wing_load1, deltamach, deltat, air_temp,
+    thstld4 = thstld_turn(wngld1, load_turn2, alt[3], mach[3], CLmax, 
+                              alpha4, beta[3]) 
+    thstld5 = thstld_horzaccel(wngld1, deltamach, deltat, air_temp,
                                     alt[4], mach[4], CLmax, alpha5, beta[4]) 
-    thrst_ld6 = thrst_ld_landing(wing_load1, densitys, CLmax, landing_drag, 
+    thstld6 = thstld_landing(wngld1, densitys, CLmax, landing_drag, 
                                  thrust_reverse, beta[5], mutd, ktd, 
                                  takeoff_distance)
-    thrst_ld7 = thrst_ld_cruise(wing_load1, alt[6], mach[6], CLmax, alpha7, 
+    thstld7 = thstld_cruise(wngld1, alt[6], mach[6], CLmax, alpha7, 
                                 beta[6]) 
     
-    thrst_ld6 = units.convert_pressure(thrst_ld6, "psi")*144
+    thstld6 = units.convert_pressure(thstld6, "psi")*144
 
-    plt.plot(wing_load1a, thrst_ld1, label="Takeoff", linestyle='--')
-    plt.plot(wing_load1a, thrst_ld2, label="Cruise", linestyle='--')
-    plt.plot(wing_load1a, thrst_ld3, label="Turn 1", linestyle='--')
-    plt.plot(wing_load1a, thrst_ld4, label="Turn 2", linestyle='--')
-    plt.plot(wing_load1a, thrst_ld5, label="Accel", linestyle='--')
-    plt.vlines(thrst_ld6, .4, 1.6, label="Landing", linestyle='--')
-    plt.plot(wing_load1a, thrst_ld7, label="Max Mach", linestyle='--')
+    plt.plot(wngld1a, thstld1, label="Takeoff", linestyle='--')
+    plt.plot(wngld1a, thstld2, label="Cruise", linestyle='--')
+    plt.plot(wngld1a, thstld3, label="Turn 1", linestyle='--')
+    plt.plot(wngld1a, thstld4, label="Turn 2", linestyle='--')
+    plt.plot(wngld1a, thstld5, label="Accel", linestyle='--')
+    plt.vlines(thstld6, .4, 1.6, label="Landing", linestyle='--')
+    plt.plot(wngld1a, thstld7, label="Max Mach", linestyle='--')
 
     plt.legend()
     plt.ylim([.4, 1.6])
@@ -415,7 +500,7 @@ def constraint_analysis(eng_type):
     # plt.show()
     plt.close()
 
-def power_analysis(thrust_load, wing_load, thrtl_ratio, eng_type, CLmax):
+def power_anlys(thstld, wngld, thrtlrto, engtype, CLmax):
     """
     Notes
     -----
@@ -431,7 +516,7 @@ def power_analysis(thrust_load, wing_load, thrtl_ratio, eng_type, CLmax):
 
     load_factor = 1
     beta = .97
-    wing_load = units.convert_pressure(wing_load/144, 'Pa')
+    wngld = units.convert_pressure(wngld/144, 'Pa')
     N = 50
     velocity = np.linspace(100, 1900, N)*.0254*12 # ft/sec
     altitude = np.linspace(0, 60000, N) # ft
@@ -440,8 +525,8 @@ def power_analysis(thrust_load, wing_load, thrtl_ratio, eng_type, CLmax):
     for i, alt in enumerate(altitude):
         for j, vel in enumerate(velocity):
             mach = (vel/atmos(alt).speed_of_sound)[0]
-            alpha = get_thrust_lapse(thrtl_ratio, mach, eng_type, 'mil', alt)
-            power[i][j] = excess_power(wing_load, thrust_load, load_factor, 
+            alpha = get_thstlps(thrtlrto, mach, engtype, 'mil', alt)
+            power[i][j] = excess_power(wngld, thstld, load_factor, 
                                  vel, alt, mach, CLmax, alpha, beta)
     power = power/12/.0254
 
@@ -455,17 +540,17 @@ def power_analysis(thrust_load, wing_load, thrtl_ratio, eng_type, CLmax):
     alt = 36000
     vel = 1400*12*.0254
     mach = vel/(atmos(alt).speed_of_sound)[0]
-    alpha = get_thrust_lapse(thrtl_ratio, mach, eng_type, 'mil', alt)
-    pwr = excess_power(wing_load, thrust_load, load_factor, vel, alt, mach, 
+    alpha = get_thstlps(thrtlrto, mach, engtype, 'mil', alt)
+    pwr = excess_power(wngld, thstld, load_factor, vel, alt, mach, 
                        CLmax, alpha, beta)
     print(pwr/.0254/12)
 
-def empty_wieght_frac(takeoff_weight, type='fighter'):
+def empty_weight_frac(takeoff_weight, type='fighter'):
     """
     Notes
     -----
-    Preliminary results for empty wieght fraction, the ratio of empty
-    aircrat wieght to takeoff weight (We/Wto).
+    Preliminary results for empty weight fraction, the ratio of empty
+    aircrat weight to takeoff weight (We/Wto).
 
     p 71
     
@@ -486,7 +571,7 @@ def empty_wieght_frac(takeoff_weight, type='fighter'):
 
     return we_frac
 
-def tsfc_initial(mach0, theta, eng_type, mode):
+def tsfc_initial(mach0, theta, engtype, mode):
     """
     Notes
     -----
@@ -495,7 +580,7 @@ def tsfc_initial(mach0, theta, eng_type, mode):
 
     p 71
     """
-    match eng_type:
+    match engtype:
         case 'hbtf': # high bypass turbofan
             tsfc = (0.45+0.54*mach0)*np.sqrt(theta)
         case 'lbtf': # low bypass turbofan
@@ -513,15 +598,17 @@ def tsfc_initial(mach0, theta, eng_type, mode):
 
     return tsfc
 
-def eng_const(eng_type, mode):
+def get_engconst(engtype, mode):
     """
     Notes
     -----
     Get engine type specific constants for mission analysis
 
+    p 71
+
     Parameters
     ----------
-    eng_type:
+    engtype:
         hbtf : high bypass turbofan constants returned
         lbtf : high bypass turbofan constants returned
         tj : turbojet constants returned
@@ -536,7 +623,7 @@ def eng_const(eng_type, mode):
     1: C2 units 1/hour
 
     """
-    match eng_type:
+    match engtype:
         case 'hbtf': # high bypass turbofan
             consts = [0.45, 0.54]
         case 'lbtf': # low bypass turbofan
@@ -554,7 +641,7 @@ def eng_const(eng_type, mode):
     
     return consts
 
-def bcm_bca(beta, CLmax, wing_load, mach_crit=0.9, CDR=0, Pstd=101325, gamma=1.4):
+def get_bcmbca(beta, CLmax, wngld, mach_crit=0.9, CDR=0, Pstd=101325, gamma=1.4):
     """
     Notes
     -----
@@ -562,84 +649,77 @@ def bcm_bca(beta, CLmax, wing_load, mach_crit=0.9, CDR=0, Pstd=101325, gamma=1.4
     cruise mach number is M=.9 after which divergence drag begins
     """
     CD0, K1, _ = get_drag_polar(mach_crit, CLmax)
-    bca = 2*beta*wing_load/gamma/Pstd/mach_crit*2*np.sqrt((CD0+CDR)/K1)
+    bca = 2*beta*wngld/gamma/Pstd/mach_crit*2*np.sqrt((CD0+CDR)/K1)
 
     return bca
 
-def wght_frac_warmup(alt, deltat, thrust_load, eng_type, mode, alpha, beta):
+def wf_warmup(alt, deltat, thstld, engtype, mode, alpha, beta):
     """
-    Notes Calculates wieght fraction of aircraft after warm-up
+    Notes
+    -----
+    Calculates weight fraction of aircraft after warm-up
 
     p 67
     """
     theta = get_atmos(alt)[0]
-    C1, _ = eng_const(eng_type, mode)
+    C1, _ = get_engconst(engtype, mode)
 
-    wght_frac = 1 - C1/3600*np.sqrt(theta)*alpha/beta*thrust_load*deltat
+    wght_frac = 1 - C1/3600*np.sqrt(theta)*alpha/beta*thstld*deltat
     
     return wght_frac
 
-def wght_frac_toaccel(alt, drag_coeff, fric_coeff, mach, mach_to, vel, thrust_load, wing_load, eng_type,
+def wf_toaccel(alt, drag_coeff, fric_coeff, mach, mach_to, vel, thstld, wngld, engtype,
                       mode, alpha, beta, g0=9.81):
     """
-    Notes Calculates wieght fraction of aircraft after takeoff
+    Notes
+    -----
+    Calculates weight fraction of aircraft after takeoff
     acceleration
 
     p 63
     """
     theta = get_atmos(alt)[0]
-    C1, C2 = eng_const(eng_type, mode)
+    C1, C2 = get_engconst(engtype, mode)
     dyn_press = get_dyn_press(alt, mach_to)
 
-    ttldrag_thrst = (drag_coeff*dyn_press/beta/wing_load+fric_coeff)*(
-        beta/alpha/thrust_load)
+    ttldrag_thrst = (drag_coeff*dyn_press/beta/wngld+fric_coeff)*(
+        beta/alpha/thstld)
 
     wght_frac = np.exp(-(C1+C2*mach)/3600*np.sqrt(theta)/g0*vel/
                         (1-ttldrag_thrst))
 
     return wght_frac
 
-def wght_frac_torot(alt, mach_to, thrust_load, eng_type, mode, alpha, beta, 
+def wf_torot(alt, mach_to, thstld, engtype, mode, alpha, beta, 
                     rot_time=3):
     """
-    Notes Calculates wieght fraction of aircraft after takeoff rotation
+    Notes
+    -----
+    Calculates weight fraction of aircraft after takeoff rotation
 
     p 68
     """
     theta = get_atmos(alt)[0]
-    C1, C2 = eng_const(eng_type, mode)
+    C1, C2 = get_engconst(engtype, mode)
 
     wght_frac = 1-(C1+C2*mach_to)/3600*np.sqrt(theta)*alpha/beta*(
-        thrust_load*rot_time)
+        thstld*rot_time)
 
     return wght_frac
 
-def get_takeoff_vel(beta, CLmax, densitys, wing_load, kto=1.2):
-    """
-    Notes
-    -----
-    Calculates the takeoff velocity
-    
-    p 29
-    """
-    vel_to = kto*np.sqrt(2*beta/densitys/CLmax*wing_load)
-    return vel_to
-
-def mission_analysis(thrust_load, wing_load, thrtl_ratio, eng_type, CLmax):
+def wf_takeoff(alt_to, thstld, wngld, thrtlrto, engtype, CLmax):
     """
     Notes
     -----
     Function to compare this codes results to book results
     """
-    wing_load = units.convert_pressure(wing_load/144, 'Pa')
-    alt_to = 2000
-
+    
     mach_wu = 0
     beta_wu = 1
     deltat = 60 # s
     mode_wu = 'mil'
-    alpha_wu = get_thrust_lapse(thrtl_ratio, mach_wu, eng_type, mode_wu, alt_to)
-    beta_wu = wght_frac_warmup(alt_to, deltat, thrust_load, eng_type, mode_wu, alpha_wu, beta_wu)
+    alpha_wu = get_thstlps(thrtlrto, mach_wu, engtype, mode_wu, alt_to)
+    beta_wu = wf_warmup(alt_to, deltat, thstld, engtype, mode_wu, alpha_wu, beta_wu)
 
     mach_to = .1819
     mach_toa = .1
@@ -647,34 +727,75 @@ def mission_analysis(thrust_load, wing_load, thrtl_ratio, eng_type, CLmax):
     fric_coeff_toa = .05
     mode_toa = 'max'
     densitys = get_atmos(alt_to)[4]
-    vel_to = get_takeoff_vel(beta_wu, CLmax, densitys, wing_load)
-    alpha_toa = get_thrust_lapse(thrtl_ratio, mach_toa, eng_type, mode_toa, alt_to)
-    beta_toa = wght_frac_toaccel(alt_to, drag_coeff_toa, fric_coeff_toa, mach_toa, mach_to, vel_to, thrust_load, wing_load, eng_type,
+    vel_to = get_takeoff_vel(beta_wu, CLmax, densitys, wngld)
+    alpha_toa = get_thstlps(thrtlrto, mach_toa, engtype, mode_toa, alt_to)
+    beta_toa = wf_toaccel(alt_to, drag_coeff_toa, fric_coeff_toa, mach_toa, mach_to, vel_to, thstld, wngld, engtype,
                       mode_toa, alpha_toa, beta_wu)
     
     beta1 = beta_toa*beta_wu
-    alpha_torot = get_thrust_lapse(thrtl_ratio, mach_to, eng_type, mode_toa, alt_to)
-    beta_torot = wght_frac_torot(alt_to, mach_to, thrust_load, eng_type, mode_toa, alpha_torot, beta1)
-
-    beta2 = beta1*beta_torot
+    alpha_torot = get_thstlps(thrtlrto, mach_to, engtype, mode_toa, alt_to)
+    beta_torot = wf_torot(alt_to, mach_to, thstld, engtype, mode_toa, alpha_torot, beta1)
     
-    print(beta2)
+    return (beta_wu, beta_toa, beta_torot)
+
+
+def wf_horzaccel(beta_prev, alt, wngld, mach, alpha, CLmax, velf, veli, engtype, eng_mode, CDR=0, g0=9.81, gamma=1.4):
+    """
+    Notes
+    -----
+    Calculates weight fraction of aircraft after takeoff rotation
+
+    p 62
+    """
+
+    CL = 2*beta_prev*(wngld/gamma/Pstd/get_atmos(alt)[1]/mach**2)
+    CD0, K1, CD = get_drag_polar(mach, CLmax, CL=CL)
+    C1, C2 = get_engconst(engtype, eng_mode)
+
+    first = -(C1/mach+C2)*3600/sound_speed_std
+    dvel = velf**2 - veli**2
+    third = (CD+CDR)/CL/(beta_prev/alpha)/wngld
+    print(first/3600*sound_speed_std)
+    print(dvel/2/g0/12/.0254)
+    print(third, CD, CL, beta_prev, alpha)
+    second = dvel/2/g0/(1-third)
+    beta = np.exp(first*second)
+    print(beta)
+    return beta
+
+def mission_anlys(thstld, wngld, thrtlrto, engtype, CLmax):
+    """
+    Notes
+    -----
+    Perform a weight anlys over the entire mission set
+    """
+    wngld = units.convert_pressure(wngld/144, 'Pa')
+    alt_to = 2000
+    betas_to = wf_takeoff(alt_to, thstld, wngld, thrtlrto, engtype, CLmax)
+    beta_to = betas_to[0]*betas_to[1]*betas_to[2]
+
+    mach = .4410
+    veli = 211.1*.0254*12
+    velf = 812*.0254*12
+    alt = 2000
+    alpha = get_thstlps(thrtlrto, mach, engtype, 'mil')
+    wf_horzaccel(beta_to, alt, wngld, mach, alpha, CLmax, velf, veli, engtype, 'mil')
     
     
 def main():
-    eng_type = 'lbtf' # low bypass turbofan
+    engtype = 'lbtf' # low bypass turbofan
 
-    # constraint_analysis(eng_type)
+    # constraint_anlys(engtype)
 
     # Aircraft intrinsic properties
     CLmax = 2
     # Chosen design point
-    thrust_load = 1.25
-    wing_load = 64 # lbf/ft^2
-    throttle_ratio = 1.07
+    thstld = 1.25
+    wngld = 64 # lbf/ft^2
+    thrtlrto = 1.07
 
-    # power_analysis(thrust_load, wing_load, throttle_ratio, eng_type, CLmax)
-    mission_analysis(thrust_load, wing_load, throttle_ratio, eng_type, CLmax)
+    # power_anlys(thstld, wngld, thrtlrto, engtype, CLmax)
+    mission_anlys(thstld, wngld, thrtlrto, engtype, CLmax)
 
 if __name__ == '__main__':
     main()
