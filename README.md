@@ -35,6 +35,8 @@ K2 | drag polar coefficient 2 | K2 = -2K"CLmin | K2
 | drgcf | drag coefficient |  | &epsilon;
 | frccf | friction coefficient |  | &mu;
 | velrt | velocity ratio | velocity/stall_velocity | k
+| prsscf | pressure coefficient | (P-Pinf)/q | C_p
+| prssrto | pressure ratio | P/Pt | P/Pt
 |
 | thetat | nondimensional total temperature | Tt/Tstd | &theta;_0
 | thetas | nondimensional static temperature | Ts/Tstd | &theta;
@@ -44,9 +46,6 @@ K2 | drag polar coefficient 2 | K2 = -2K"CLmin | K2
 | sigmat | nondimensional static density | densitys/densitystd | &psi;
 | dynpress | dynamic pressure | density*velocity^2/2 | q
 | thetabrk | theta break | control system maximum Tt4 and compressor pressure ratio | &theta;_0_break
-| alt | altiude | | 
-| gamma | ratio of specific heat | cp/cv | &gamma;
-| Rgas | gas specific gas constant | | R
 |
 | swpang | wing sweep angle |  | &Lambda;
 | ldfactor | load factor |  | n
@@ -55,6 +54,10 @@ K2 | drag polar coefficient 2 | K2 = -2K"CLmin | K2
 | drgthst | total drag-to-thrust ratio | | u
 | tsfc | thrust specific fuel consumption | fuel_rate/thrust | tsfc
 | mfp | mass flow parameter | fcn(gas, mach) | mfp 
+|
+| alt | altiude | | 
+| Rgas | gas specific gas constant | | R
+| gamma | ratio of specific heat | cp/cv | &gamma;
 
 ### Abbreviations 
 | Abbr | Expansion
@@ -77,3 +80,5 @@ K2 | drag polar coefficient 2 | K2 = -2K"CLmin | K2
 | td | touchdown
 | obs | obstacle
 | drgplr | drag polar
+| crit | critical
+| ang | angle

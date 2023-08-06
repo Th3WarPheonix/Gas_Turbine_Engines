@@ -58,11 +58,14 @@ drgthst : total drag-to-thrust ratio : : u
 tsfc : thrust specific fuel consumption : fuel_rate/thrust : tsfc
 mfp : mass flow parameter : fcn(gas, mach) : mfp 
 
-Abbreviations and tags
-----------------------
+Abbreviations 
+-------------
 BCA : best cruise altitude
 BCM : best cruise altitude
 SLS : sea level static
+
+Subscripts
+----------
 dry : afterburner off
 wet : afterburner on
 anlys : analysis
