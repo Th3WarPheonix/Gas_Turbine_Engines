@@ -4,7 +4,10 @@ Currently an amalgamation of gas turbine engine cycle design equations and compo
 ## Sources:  
 [1] University class  
 [2] Aircraft Propulsion 3e Farokhi  
-[3] Aircraft Engines Design 2e Mattingly Heiser Pratt
+[3] Aircraft Engines Design 2e Mattingly Heiser Pratt  
+[4] US Standard Atmosphere 1976
+
+Ref [4]: https://ntrs.nasa.gov/api/citations/19770009539/downloads/19770009539.pdf
 
 ## Legend
 Listing of variables, subscripts, abbreviations, and symbols found in code and their basic descritpion for eqasy reference and consistency
