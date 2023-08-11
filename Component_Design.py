@@ -1,7 +1,7 @@
 
 import numpy as np
 import IsentropicFlow as isenf
-import RootFinding as rootfind
+import RootFinding as rtfd
 import Unit_Conversions as units
 
 def _find_mach(mach, massflow, dnyt, Tt, area, gamma, Rgas):
@@ -386,7 +386,7 @@ def dsgn_inlet(Ts0, Ps0, mach0, massflow0, A0AHL, mach_throat, mach1, IPR,
             static_temperatures, total_temperatures, static_pressures, 
             total_pressures, mach_numbers)
 
-def nacelle_dsgn(mach0, mach1, area0area1, prsscf, gamma=1.4):
+def dsgn_ncle(mach0, mach1, area0area1, prsscf, gamma=1.4):
     """
     Notes
     -----
@@ -461,7 +461,7 @@ def spsc_prssrcvy(mach0, std='MIL'):
 
     return prssrto
 
-def compressor_dsgn(max_tip_diam, max_tip_spd, aspect_ratio, work_coeff, 
+def dsgn_cmprsr(max_tip_diam, max_tip_spd, aspect_ratio, work_coeff, 
                       total_work, inlet_radius_ratio, Tt2, Pt2, massflow2, 
                       Tt31, Pt31, massflow31, mach31, 
                       gamma=1.4, Rgas=287.05):
@@ -548,9 +548,9 @@ def compressor_dsgn(max_tip_diam, max_tip_spd, aspect_ratio, work_coeff,
     stage_work = work_coeff*avg_velocity**2/2 # work per stage
     num_stages = total_work/stage_work
     num_stages = np.ceil(num_stages)
-    compressor_length = 2*num_stages*avg_blade_width + (2*num_stages-1)*avg_gap 
+    cmprsr_length = 2*num_stages*avg_blade_width + (2*num_stages-1)*avg_gap 
     
-    mach2 = rootfind.newton2(_find_mach, .469, massflow=massflow2, 
+    mach2 = rtfd.newton2(_find_mach, .469, massflow=massflow2, 
                              dnyt=dnyt2, Tt=Tt2, area=inlet_flow_area, 
                              gamma=gamma, Rgas=Rgas)
     Ts2 = isenf.static_temperature(mach2, Tt2)
@@ -572,11 +572,11 @@ def compressor_dsgn(max_tip_diam, max_tip_spd, aspect_ratio, work_coeff,
     blades_values = np.array([avg_gap, avg_blade_height, avg_blade_width, 
                               inlet_hub_radius*2, outlet_hub_diam])
 
-    return (splspd_rpm, num_stages, compressor_length, blades_values, 
+    return (splspd_rpm, num_stages, cmprsr_length, blades_values, 
             static_temperatures, total_temperatures, static_pressures, 
             total_pressures, mach_numbers)
 
-def compressor_blade_dsgn(Tt0, Pt0, mach0, massflow, flowarea1, CPR, 
+def dsgn_cmprsrbld(Tt0, Pt0, mach0, massflow, flowarea1, CPR, 
                             num_stages, stage_eff, loss_coeff_rtr, 
                             loss_coeff_sttr, splspd, pitch_diam1, 
                             pitch_diam2, gamma=1.4, Rgas=287.05):
@@ -648,17 +648,16 @@ def compressor_blade_dsgn(Tt0, Pt0, mach0, massflow, flowarea1, CPR,
     velc1 = 522.87*.0254*12 # initial guess
     Pt2 = 0 # initial
     while abs(Pt2_target-Pt2) > 1e-6:
-        velc1 = rootfind.newton2(_find_cz, velc1, Ts0=Ts0, Pt1=Pt1, w0=wvel0, 
+        velc1 = rtfd.newton2(_find_cz, velc1, Ts0=Ts0, Pt1=Pt1, w0=wvel0, 
                                  velct1=velct1, massflow=massflow, 
                                  flowarea1=flowarea1, 
                                  splspd1=splspd1, 
                                  splspd2=splspd2, 
                                  cp_gas=cp_gas, gminusg=gminusg, Rgas=Rgas)
         
-        _, Tt1, dnys1, Ts1 = _find_cz(velc1, Ts0, Pt1, wvel0, velct1, 
-                                               massflow, flowarea1, 
-                                               splspd1, splspd2, 
-                                               cp_gas, gminusg, Rgas)
+        _, Tt1, dnys1, Ts1 = _find_cz(velc1, Ts0, Pt1, wvel0, velct1, massflow, 
+                                      flowarea1, splspd1, splspd2, cp_gas, 
+                                      gminusg, Rgas)
         
         Pt1s = Pt0*(Tt1/Tt0)**(1/gminusg) # isentropic total pressure
         prssloss_rtr = loss_coeff_rtr*(0.5*dnys0*wvel0**2)
@@ -673,7 +672,7 @@ def compressor_blade_dsgn(Tt0, Pt0, mach0, massflow, flowarea1, CPR,
     mach1 = velc1/np.sqrt(gamma*Rgas*Ts1)
     Ps1 = isenf.static_pressure(mach1, Pt1)
     dnyt2 = Pt2/Rgas/Tt2
-    mach2 = rootfind.newton2(_find_mach, 0.1, massflow=massflow, 
+    mach2 = rtfd.newton2(_find_mach, 0.1, massflow=massflow, 
                              dnyt=dnyt2, Tt=Tt2, area=flowarea1, 
                              gamma=gamma, Rgas=Rgas)
     Ts2 = isenf.static_temperature(mach2, Tt2)
@@ -714,7 +713,7 @@ def compressor_blade_dsgn(Tt0, Pt0, mach0, massflow, flowarea1, CPR,
             relative_angs, absolute_velocities, relative_velocities, 
             mach_numbers)
 
-def airfoil_layout(beta0, beta1, alpha1, alpha2, rtr_sldty, rtr_diam, 
+def cmprsr_arfls(beta0, beta1, alpha1, alpha2, rtr_sldty, rtr_diam, 
                    rtr_width, sttr_sldty, sttr_diam, sttr_width, 
                    max_thckn, le_thckn, te_thckn):
     """
@@ -792,7 +791,7 @@ def airfoil_layout(beta0, beta1, alpha1, alpha2, rtr_sldty, rtr_diam,
     return np.array([num_airfoils, rtr_values, sttr_values, rtr_thckns, 
                      sttr_thckns])
 
-def cmbstr_dsgn(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, 
+def dsgn_cmbstr(Tt31, Pt31, airflow, ref_vel, pitch_diam, flow_split, 
                      passage_vel, min_diam_casing, max_diam_casing, 
                      max_dome_vel, comblen_domeheight, fuelflow, LHV, 
                      length_height, wall_ang, height_turbine_inlet, 
@@ -1022,7 +1021,7 @@ def cmbstr_prsslss(Tt31:float, Pt31:float, Tt4:float, area31:float,
     match method:
         case 'book':
             # derived from book p517
-            machin = rootfind.newton2(prediff_mach, .5, mach1=mach31, 
+            machin = rtfd.newton2(prediff_mach, .5, mach1=mach31, 
                                       Pt31=Pt31, Ptin=Ptin, area31=area31, 
                                       dome_area=dome_area, gamma=gamma) 
         case 'class':
@@ -1035,7 +1034,7 @@ def cmbstr_prsslss(Tt31:float, Pt31:float, Tt4:float, area31:float,
 
     return deltaPt, Ptin, machin
 
-def dsgn_trbn_blade(Tt0, Pt0, Tt2, Pt2, work, alpha2, massflow, tip_diam, 
+def dsgn_trbnbld(Tt0, Pt0, Tt2, Pt2, work, alpha2, massflow, tip_diam, 
                          hub_diam, splspd, stage_eff, gamma_hot, 
                          gamma_cold=1.4, Rgas=287.05):
     """
@@ -1096,7 +1095,7 @@ def dsgn_trbn_blade(Tt0, Pt0, Tt2, Pt2, work, alpha2, massflow, tip_diam,
     # Before stator
     flow_area = np.pi*(tip_diam**2 - hub_diam**2)/4
     dnyt0 = Pt0/Tt0/Rgas
-    mach0 = rootfind.newton2(_find_mach, .3, massflow=massflow, 
+    mach0 = rtfd.newton2(_find_mach, .3, massflow=massflow, 
                              dnyt=dnyt0, Tt=Tt0, area=flow_area, 
                              gamma=gamma_hot, Rgas=Rgas)
     Ps0 = isenf.static_pressure(mach0, Pt0, gamma=gamma_hot)
@@ -1107,7 +1106,7 @@ def dsgn_trbn_blade(Tt0, Pt0, Tt2, Pt2, work, alpha2, massflow, tip_diam,
     velct1 = work/splspd1
     velwt1 = velct1 - splspd1
 
-    mach1 = rootfind.newton2(_find_mach2, .9, massflow=massflow, 
+    mach1 = rtfd.newton2(_find_mach2, .9, massflow=massflow, 
                              dnyt=dnyt0, Tt=Tt0, flow_area=flow_area, 
                              velocity_comp=velct1, gamma=gamma_hot, 
                              Rgas=Rgas)
@@ -1122,7 +1121,7 @@ def dsgn_trbn_blade(Tt0, Pt0, Tt2, Pt2, work, alpha2, massflow, tip_diam,
 
     # After rotor
     dnyt2 = Pt2/Tt2/Rgas
-    mach2 = rootfind.newton2(_find_mach, .3, massflow=massflow, 
+    mach2 = rtfd.newton2(_find_mach, .3, massflow=massflow, 
                              dnyt=dnyt2, Tt=Tt2, area=flow_area, 
                              gamma=gamma_hot, Rgas=Rgas)
     Ps2 = isenf.static_pressure(mach2, Pt2, gamma_hot)
@@ -1295,7 +1294,7 @@ def dsgn_inlet_test_values():
     inlet_values = dsgn_inlet(Ts0, Ps0, mach0, massflow2, A0Ahl, throat_mach,
                                  fan_mach, IPR, diffuser_ang)
 
-def compressor_dsgn_test_values():
+def dsgn_cmprsr_test_values():
     Tt2 = 464.5 # R
     Pt2 = 6.58 # psia
     massflow2 = 70.17 # lbm/s
@@ -1320,7 +1319,7 @@ def compressor_dsgn_test_values():
     max_tip_spd *= 12*.0254 # m/s
     total_work = units.convert_energy(total_work, 'J') # J/(kg/s)
 
-    compressor_values = compressor_dsgn(max_tip_diam, max_tip_spd, 
+    compressor_values = dsgn_cmprsr(max_tip_diam, max_tip_spd, 
                                           aspect_ratio, work_coeff, total_work,
                                             inlet_radius_ratio, Tt2, Pt2, 
                                             massflow2, Tt31, Pt31, massflow31, 
@@ -1341,7 +1340,7 @@ def compressor_blade_test_values():
     pitch_diam1 = 20.71*.0254
     pitch_diam2 = 21.37*.0254
 
-    cmpr_bld_vals = compressor_blade_dsgn(Tt1, Pt1, mach0, massflow, 
+    cmpr_bld_vals = dsgn_cmprsrbld(Tt1, Pt1, mach0, massflow, 
                                            flowarea2, CPR, num_stages, 
                                            stage_eff, loss_coeff_rtr, 
                                            loss_coeff_sttr, splspd, 
@@ -1365,7 +1364,7 @@ def compressor_blade_test_values():
     alpha1 = 25.2*np.pi/180
     alpha2 = 0*np.pi/180
 
-    airfoil_layout(beta0, beta1, alpha1, alpha2, rtr_sldty, rtr_diam, 
+    cmprsr_arfls(beta0, beta1, alpha1, alpha2, rtr_sldty, rtr_diam, 
                    rtr_width, sttr_sldty, sttr_diam, sttr_width,
                    max_thick, le_thick, te_thick)
 
@@ -1407,7 +1406,7 @@ def combustor_dsgn_test_values():
     passage_vel *= .0254*12
     height_turbine_inlet *= .0254
 
-    cmbstr_vals = cmbstr_dsgn(Tt31, Pt31, airflow, ref_vel, pitch_diam, 
+    cmbstr_vals = dsgn_cmbstr(Tt31, Pt31, airflow, ref_vel, pitch_diam, 
                               flow_split, passage_vel, min_diam_casing, 
                               max_diam_casing, dome_vel_max, comblendomeheight, 
                               fuelflow, LHV, lengthheight, wall_ang, 
@@ -1444,7 +1443,7 @@ def trbn_blade_test_values():
     hub_diam = hub_diam *.0254
     N *= 2*np.pi/60
 
-    trbn_values = dsgn_trbn_blade(Tt4, Pt4, Tt49, Pt49, work, alpha2, 
+    trbn_values = dsgn_trbnbld(Tt4, Pt4, Tt49, Pt49, work, alpha2, 
                                           massflow4, tip_diam, hub_diam, N, 
                                           eff_turb, gamma_hot)
     
@@ -1455,7 +1454,7 @@ def trbn_blade_test_values():
 
 if __name__ == '__main__':
     # dsgn_inlet_test_values()
-    # compressor_dsgn_test_values()
+    # dsgn_cmprsr_test_values()
     # compressor_blade_test_values()
     combustor_dsgn_test_values()
     # trbn_blade_test_values()
