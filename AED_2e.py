@@ -1,6 +1,6 @@
 
 import numpy as np
-from ambiance import Atmosphere as atmos
+import USAtmos1976
 import Unit_Conversions as units
 import matplotlib.pyplot as plt
 
@@ -89,7 +89,7 @@ def get_mfp(mach, gamma, Rgas):
     mfp = mach*np.sqrt(gamma/Rgas)*((1+(gamma-1)/2)*mach**2)**exponent
     return mfp
 
-def get_atmos(altitude):
+def get_atmos(altitude, day='std'):
     """
     Notes
     -----
@@ -103,19 +103,33 @@ def get_atmos(altitude):
     3: pressure
     4: density
     """
-    temp = atmos(altitude*.0254*12).temperature[0]
-    press = atmos(altitude*.0254*12).pressure[0]
-    density = atmos(altitude*.0254*12).pressure[0]
+    match day:
+
+        case 'std':
+            temp = USAtmos1976.stdday(altitude*.0254*12).temperature[0]
+            press = USAtmos1976.stdday(altitude*.0254*12).pressure[0]
+            density = USAtmos1976.stdday(altitude*.0254*12).pressure[0]
+        case 'hot':
+            temp = USAtmos1976.hotday(altitude*.0254*12).temperature[0]
+            press = USAtmos1976.hotday(altitude*.0254*12).pressure[0]
+            density = USAtmos1976.hotday(altitude*.0254*12).pressure[0]
+        case 'trop':
+            temp = USAtmos1976.tropday(altitude*.0254*12).temperature[0]
+            press = USAtmos1976.tropday(altitude*.0254*12).pressure[0]
+            density = USAtmos1976.tropday(altitude*.0254*12).pressure[0]
+        case 'cold':
+            temp = USAtmos1976.coldday(altitude*.0254*12).temperature[0]
+            press = USAtmos1976.coldday(altitude*.0254*12).pressure[0]
+            density = USAtmos1976.coldday(altitude*.0254*12).pressure[0]
+        case _:
+            print('not a known type of day')
+            return None
     
     thetas = temp/288.15
     deltas = press/101325
-    if altitude == 2000:
-        thetas = 1.0796
-        deltas = 0.9298
-        density = deltas/thetas*1.225
     return (thetas, deltas, temp, press, density)
 
-def get_dyn_press(alt, mach, gamma=1.4):
+def get_dynpress(alt, mach, gamma=1.4):
     """
     Notes
     -----
@@ -132,7 +146,7 @@ def get_dyn_press(alt, mach, gamma=1.4):
     alt : altitude in feet
     """
 
-    deltas = get_atmos(alt)[1]
+    deltas = get_atmos(alt, 'std')[1]
     return deltas*101325*mach**2*gamma/2
 
 
@@ -195,8 +209,7 @@ def get_drgplr(mach0:int, CLmax, velrt=1.25, K2=0, CL=0, suppress=False):
 
     return (CD0, K1, CD)
 
-def get_thstlps(thrtlrto:float, mach0, engine_type,
-                     engmode, alt:float=30000, gamma=1.4):
+def get_thstlps(thrtlrto, mach0, engine_type, engmode, day, alt, gamma=1.4):
     """
     Notes
     -----
@@ -218,13 +231,9 @@ def get_thstlps(thrtlrto:float, mach0, engine_type,
         max : max power
     alt : altitude in feet
     """
-    
-    if alt == 2000:
-        thetas = 1.0796
-        deltas = .9298
-    else:
-        thetas = get_atmos(alt)[0]
-        deltas = get_atmos(alt)[1]
+
+    thetas = get_atmos(alt, day)[0]
+    deltas = get_atmos(alt, day)[1]
 
     # normalized total temperature and total pressure
     norm_Tt = thetas*(1+(gamma-1)/2*mach0**2)
@@ -269,6 +278,7 @@ def get_takeoff_vel(instwf, CLmax, densitys, wngld, kto=1.2):
     p 29
     """
     vel_to = kto*np.sqrt(2*instwf/densitys/CLmax*wngld)
+    print(284, kto, instwf, densitys, CLmax, wngld)
     return vel_to
 
 
@@ -316,7 +326,7 @@ def thstld_cruise(wngld, alt, mach, CLmax, thstlps, instwf,
 
     pg 26
     """
-    dyn_press = get_dyn_press(alt, mach)
+    dyn_press = get_dynpress(alt, mach)
     CD0, K1, CD = get_drgplr(mach, CLmax)
     thstld = instwf/thstlps*(K1*instwf/dyn_press*wngld + K2 + (CD0+CDR)/instwf*
                          dyn_press/wngld) 
@@ -334,7 +344,7 @@ def thstld_turn(wngld, load_factor, alt, mach, CLmax, thstlps, instwf, CDR=0, K2
 
     pg 26
     """
-    dyn_press = get_dyn_press(alt, mach)
+    dyn_press = get_dynpress(alt, mach)
     CD0, K1, CD = get_drgplr(mach, CLmax)
 
     help1  = K1*load_factor**2*instwf/dyn_press
@@ -356,7 +366,7 @@ def thstld_horzaccel(wngld, deltamach, deltat, air_temp, alt, mach, CLmax,
 
     pg 27
     """
-    dyn_press = get_dyn_press(alt, mach)
+    dyn_press = get_dynpress(alt, mach)
     CD0, K1, CD = get_drgplr(mach, CLmax)
 
     help1  = K1*instwf/dyn_press
@@ -417,7 +427,7 @@ def excess_power(wngld, thstld, load_factor, velocity, alt, mach, CLmax, thstlps
     alt : altitude in feet no regard for other units
     all other parameters units in SI
     """
-    dyn_press = get_dyn_press(alt, mach)
+    dyn_press = get_dynpress(alt, mach)
     CD0, K1, CD = get_drgplr(mach, CLmax, suppress=True)
 
     help1  = thstlps/instwf*thstld
@@ -451,7 +461,7 @@ def constraint_anlys(engtype):
     deltamach = .8
     deltat = 50
 
-    air_temp = get_atmos(30000)[0]*288.15
+    air_temp = get_atmos(30000, 'std')[0]*288.15
     kto = 1.2
     ktd = 1.15
     muto = .05
@@ -497,7 +507,7 @@ def constraint_anlys(engtype):
     plt.legend()
     plt.ylim([.4, 1.6])
     plt.xlim([20, 120])
-    # plt.show()
+    plt.show()
     plt.close()
 
 def power_anlys(thstld, wngld, thrtlrto, engtype, CLmax):
@@ -524,7 +534,7 @@ def power_anlys(thstld, wngld, thrtlrto, engtype, CLmax):
      
     for i, alt in enumerate(altitude):
         for j, vel in enumerate(velocity):
-            mach = (vel/atmos(alt).speed_of_sound)[0]
+            mach = (vel/USAtmos1976.stdday(alt).speed_of_sound)[0]
             thstlps = get_thstlps(thrtlrto, mach, engtype, 'mil', alt)
             power[i][j] = excess_power(wngld, thstld, load_factor, vel, alt, 
                                        mach, CLmax, thstlps, instwf)
@@ -575,7 +585,7 @@ def tsfc_initial(mach0, theta, engtype, engmode):
     """
     Notes
     -----
-    Provide an inital estimate for the thrust specific fuel consumption
+    Provide an initial estimate for the thrust specific fuel consumption
     units of 1/hour
 
     p 71
@@ -673,18 +683,17 @@ def wf_toaccel(alt, drgcf, frccf, mach, mach_to, vel, thstld, wngld, engtype,
     """
     Notes
     -----
-    Calculates weight fraction of aircraft after takeoff
-    acceleration
+    Calculates weight fraction of aircraft after takeoff acceleration
 
     p 63
     """
     thetas = get_atmos(alt)[0]
     C1, C2 = get_engconst(engtype, engmode)
-    dyn_press = get_dyn_press(alt, mach_to)
+    dyn_press = get_dynpress(alt, mach_to)
 
-    ttldrag_thrst = (drgcf*dyn_press/instwf/wngld+frccf)*(
-        instwf/thstlps/thstld)
-
+    ttldrag_thrst = (drgcf*dyn_press/instwf/wngld+frccf)*(instwf/thstlps/
+                                                          thstld)
+    print(700, instwf, thstlps, thstld)
     wght_frac = np.exp(-(C1+C2*mach)/3600*np.sqrt(thetas)/g0*vel/
                         (1-ttldrag_thrst))
 
@@ -711,14 +720,15 @@ def wf_takeoff(alt_to, thstld, wngld, thrtlrto, engtype, CLmax):
     """
     Notes
     -----
-    Function to compare this codes results to book results
+    Calculates the weight fraction the takeoff sequence: warm-up, acceleration, and rotation
+    Returns three weight fraction values: warm-up, acceleration, and rotation
     """
     
     mach_wu = 0
     instwf_wu = 1
     deltat = 60 # s
     engmode_wu = 'mil'
-    thstlps_wu = get_thstlps(thrtlrto, mach_wu, engtype, engmode_wu, alt_to)
+    thstlps_wu = get_thstlps(thrtlrto, mach_wu, engtype, engmode_wu, 'std', alt_to)
     instwf_wu = wf_warmup(alt_to, deltat, thstld, engtype, engmode_wu, thstlps_wu, instwf_wu)
 
     mach_to = .1819
@@ -726,18 +736,17 @@ def wf_takeoff(alt_to, thstld, wngld, thrtlrto, engtype, CLmax):
     drgcf_toa = .3612
     frccf_toa = .05
     engmode_toa = 'max'
-    densitys = get_atmos(alt_to)[4]
+    densitys = get_atmos(alt_to, 'std')[4]
     vel_to = get_takeoff_vel(instwf_wu, CLmax, densitys, wngld)
-    thstlps_toa = get_thstlps(thrtlrto, mach_toa, engtype, engmode_toa, alt_to)
+    thstlps_toa = get_thstlps(thrtlrto, mach_toa, engtype, engmode_toa, 'std', alt_to)
     instwf_toa = wf_toaccel(alt_to, drgcf_toa, frccf_toa, mach_toa, mach_to, vel_to, thstld, wngld, engtype,
                       engmode_toa, thstlps_toa, instwf_wu)
     
     instwf1 = instwf_toa*instwf_wu
-    thstlps_torot = get_thstlps(thrtlrto, mach_to, engtype, engmode_toa, alt_to)
+    thstlps_torot = get_thstlps(thrtlrto, mach_to, engtype, engmode_toa, 'std', alt_to)
     instwf_torot = wf_torot(alt_to, mach_to, thstld, engtype, engmode_toa, thstlps_torot, instwf1)
     
     return (instwf_wu, instwf_toa, instwf_torot)
-
 
 def wf_horzaccel(instwf_prev, alt, wngld, mach, thstlps, CLmax, velf, veli, engtype, eng_engmode, CDR=0, g0=9.81, gamma=1.4):
     """
@@ -748,16 +757,17 @@ def wf_horzaccel(instwf_prev, alt, wngld, mach, thstlps, CLmax, velf, veli, engt
     p 62
     """
 
-    CL = 2*instwf_prev*(wngld/gamma/Pstd/get_atmos(alt)[1]/mach**2)
+    CL = 2*instwf_prev*(wngld/gamma/Pstd/get_atmos(alt, 'std')[1]/mach**2)
     CD0, K1, CD = get_drgplr(mach, CLmax, CL=CL)
     C1, C2 = get_engconst(engtype, eng_engmode)
-
+    # print(CL, C1/mach+C2, CD)
+    print(thstlps, instwf_prev)
     help1 = -(C1/mach+C2)*3600/spdsnd_std
     dvel = velf**2 - veli**2
     help3 = (CD+CDR)/CL/(instwf_prev/thstlps)/wngld
-    print(help1/3600*spdsnd_std)
-    print(dvel/2/g0/12/.0254)
-    print(help3, CD, CL, instwf_prev, thstlps)
+    # print(help1/3600*spdsnd_std)
+    # print(dvel/2/g0/12/.0254)
+    # print(help3, CD, CL, instwf_prev, thstlps)
     help2 = dvel/2/g0/(1-help3)
     instwf = np.exp(help1*help2)
     print(instwf)
@@ -767,18 +777,18 @@ def mission_anlys(thstld, wngld, thrtlrto, engtype, CLmax):
     """
     Notes
     -----
-    Perform a weight anlys over the entire mission set
+    Perform a weight analysis over the entire mission set
     """
     wngld = units.convert_pressure(wngld/144, 'Pa')
     alt_to = 2000
     instwfs_to = wf_takeoff(alt_to, thstld, wngld, thrtlrto, engtype, CLmax)
     instwf_to = instwfs_to[0]*instwfs_to[1]*instwfs_to[2]
-
+    print(instwf_to)
     mach = .4410
     veli = 211.1*.0254*12
     velf = 812*.0254*12
     alt = 2000
-    thstlps = get_thstlps(thrtlrto, mach, engtype, 'mil')
+    thstlps = get_thstlps(thrtlrto, mach, engtype, 'mil', 'trop', 2000)
     wf_horzaccel(instwf_to, alt, wngld, mach, thstlps, CLmax, velf, veli, engtype, 'mil')
     
     
@@ -798,4 +808,16 @@ def main():
     mission_anlys(thstld, wngld, thrtlrto, engtype, CLmax)
 
 if __name__ == '__main__':
-    main()
+    # main()
+
+    # thstlps = get_thstlps(1.07, .4410, 'lbtf', 'mil', 'std', 2000)
+    # print(thstlps)
+    hs = np.linspace(0, 30000, 4)/.0254/12
+    t1 = get_atmos(hs, 'std')
+    # t2 = get_atmos(30000, 'cold')
+    # t3 = get_atmos(30000, 'hot')
+    # t4 = get_atmos(30000, 'trop')
+
+    # print(t1, t2, t3, t4)
+    print(hs*.0254*12)
+    print(t1)

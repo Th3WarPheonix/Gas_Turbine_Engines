@@ -3,7 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 """
-All inputs and outputs are in SI units. Functions output absolute temperatures"""
+2024 12 01 Cleared for use 
+All inputs and outputs are in SI units. Functions output absolute values
+There is a slight jump, 5%, in the pressures in the last zone of the 
+atmosphere for all days except standard. The cause has not been 
+identified but is not being pursued"""
 
 class stdday(Atmosphere):
 
