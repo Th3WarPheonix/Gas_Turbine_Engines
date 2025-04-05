@@ -1,0 +1,3 @@
+[submodule "BasicFlowEquations"]
+	path = BasicFlowEquations
+	url = https://github.com/Th3WarPheonix/Basic-Flow-Equations.git
